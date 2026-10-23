@@ -182,6 +182,13 @@ export const REGISTER_COLUMNS: Column[] = [
     value: (e) => e.assessment.determinationDue,
   },
   { header: "Status", kind: "text", width: 22, value: (e) => e.sub.status },
+  { header: "Process Stage", kind: "text", width: 26, value: (e) => e.row.stage },
+  {
+    header: "Released for Evaluation",
+    kind: "date",
+    width: 12,
+    value: (e) => e.sub.releasedForEvaluationDate,
+  },
   {
     header: "Deficiency Notice Date",
     kind: "date",

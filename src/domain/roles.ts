@@ -30,7 +30,7 @@ export type Permission =
   | "fees.waiver"
   | "documents.edit"
   | "payment.record"
-  | "payment.verify"
+  | "payment.confirm"
   | "payment.reverse"
   | "ownUse.create"
   | "letter.acknowledgement"
@@ -67,7 +67,7 @@ const MATRIX: Record<Role, Permission[]> = {
     "ownUse.create",
     "letter.acknowledgement",
   ],
-  FINANCE_OFFICER: ["payment.record", "payment.verify", "payment.reverse", "fees.waiver"],
+  FINANCE_OFFICER: ["payment.record", "payment.confirm", "payment.reverse", "fees.waiver"],
   EVALUATING_OFFICER: ["evaluation.editChecks", "submission.markComplete", "deficiency.draft"],
   REVIEWING_SUPERVISOR: [
     "evaluation.review",

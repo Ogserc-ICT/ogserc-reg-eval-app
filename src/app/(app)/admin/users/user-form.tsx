@@ -7,7 +7,7 @@ import type { ActionState } from "@/lib/action";
 
 const ROLE_HELP: Record<Role, string> = {
   REGISTRY_OFFICER: "Intake, documents, payments, own-use notifications, acknowledgement letters",
-  FINANCE_OFFICER: "Record payments, mark payments verified with bank",
+  FINANCE_OFFICER: "Record payments; confirm or reject them on the Finance Desk",
   EVALUATING_OFFICER:
     "Evaluation checks on assigned submissions, mark complete, draft deficiency notices",
   REVIEWING_SUPERVISOR: "Review evaluations, issue deficiency notices, lapse",

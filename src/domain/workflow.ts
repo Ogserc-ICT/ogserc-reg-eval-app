@@ -2,10 +2,11 @@ import { daysBetween, formatDate } from "./dates";
 import { determinationDue } from "./deadlines";
 import { paymentRequiredForCompleteness } from "./documents";
 import type { CheckCounts } from "./evaluation";
+import { gateReason } from "./finance";
 import type { DataFlag } from "./flags";
 import { formatNaira } from "./money";
 import { formatRegistrationNo } from "./numbers";
-import type { Settings } from "./reference";
+import type { Policy, Settings } from "./reference";
 import type { Assessment } from "./submission";
 import {
   FINAL_DECISION,
@@ -162,6 +163,7 @@ export function approvalBlockers(input: ApprovalInput): string[] {
   const reasons: string[] = [];
 
   if (isClosed(sub.status)) reasons.push(`Submission is closed (${sub.status})`);
+  if (!a.financeGate.cleared) reasons.push(gateReason(a.financeGate));
   if (!ev.evaluatingOfficerId) reasons.push("No evaluating officer assigned");
   if (!ev.reviewingSupervisorId) reasons.push("No reviewing supervisor assigned");
   if (!ev.approvingOfficerId) reasons.push("No approving officer assigned");
@@ -297,6 +299,10 @@ export interface ReviewItem {
 }
 
 export interface DailyReviewResult {
+  /** Acknowledged submissions whose confirmed payments clear the Finance gate (§4.12). */
+  toRelease: string[];
+  /** Acknowledged, unpaid, at or past the reminder setting (none when the setting is blank). */
+  reminderDue: string[];
   /** Submissions to move to Provisionally Registered (para 13(4)). */
   toProvisional: string[];
   /** Deficiency responses overdue; listed for a user to lapse, never auto-lapsed. */
@@ -310,7 +316,14 @@ export interface DailyReviewResult {
 }
 
 /** §4.10 daily review. Pure: the job applies the returned changes in a transaction. */
-export function dailyReview(items: readonly ReviewItem[], today: IsoDate): DailyReviewResult {
+export function dailyReview(
+  items: readonly ReviewItem[],
+  today: IsoDate,
+  policy?: Pick<Policy, "unpaidReminderDays">,
+): DailyReviewResult {
+  const toRelease: string[] = [];
+  const reminderDue: string[] = [];
+  const reminderDays = policy?.unpaidReminderDays ?? null;
   const toProvisional: string[] = [];
   const overdueDeficiency: string[] = [];
   const toLock: string[] = [];
@@ -319,6 +332,16 @@ export function dailyReview(items: readonly ReviewItem[], today: IsoDate): Daily
   let unpaidOrPartPaid = 0;
 
   for (const { sub, assessment: a } of items) {
+    if (sub.status === STATUS.AWAITING) {
+      if (a.financeGate.cleared) toRelease.push(sub.id);
+      else if (
+        reminderDays !== null &&
+        sub.dateSubmitted &&
+        daysBetween(sub.dateSubmitted, today) >= reminderDays
+      ) {
+        reminderDue.push(sub.id);
+      }
+    }
     if (sub.status === STATUS.RECEIVED && a.determinationDue && a.determinationDue < today) {
       toProvisional.push(sub.id);
     }
@@ -339,6 +362,20 @@ export function dailyReview(items: readonly ReviewItem[], today: IsoDate): Daily
 
   const summary =
     `Provisional today: ${toProvisional.length}; overdue deficiency responses: ${overdueDeficiency.length}; ` +
-    `numbers locked: ${toLock.length}; red: ${red}; amber: ${amber}; unpaid/part-paid: ${unpaidOrPartPaid}`;
-  return { toProvisional, overdueDeficiency, toLock, red, amber, unpaidOrPartPaid, summary };
+    `numbers locked: ${toLock.length}; red: ${red}; amber: ${amber}; unpaid/part-paid: ${unpaidOrPartPaid}; ` +
+    `released for evaluation: ${toRelease.length}` +
+    (reminderDays !== null
+      ? `; unpaid acknowledgements ${reminderDays}+ days: ${reminderDue.length}`
+      : "");
+  return {
+    toRelease,
+    reminderDue,
+    toProvisional,
+    overdueDeficiency,
+    toLock,
+    red,
+    amber,
+    unpaidOrPartPaid,
+    summary,
+  };
 }

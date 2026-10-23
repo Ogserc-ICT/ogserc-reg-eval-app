@@ -89,6 +89,9 @@ export default async function SubmissionPage({
         <span className="font-mono">{row.ackNo}</span>
         <StatusBadge status={sub.status!} />
         <span>
+          Stage {a.processStage.stage}: <strong>{a.processStage.label}</strong>
+        </span>
+        <span>
           Registration no. in use: <strong>{showText(a.registrationNoInUse)}</strong>
         </span>
         <span className="flex items-center gap-1">
@@ -113,6 +116,7 @@ export default async function SubmissionPage({
           <Facts
             items={[
               ["Date submitted", showDate(sub.dateSubmitted)],
+              ["Released for evaluation", showDate(sub.releasedForEvaluationDate)],
               ["Registration deadline", showDate(a.registrationDeadline)],
               ["Days late", a.daysLate ? `${a.daysLate} days` : "On time"],
               ["Days in queue", showText(a.daysInQueue)],
@@ -179,8 +183,23 @@ export default async function SubmissionPage({
               ["Late charge", showMoney(a.fees.lateCharge)],
               ["Approved waiver", showMoney(sub.approvedWaiver)],
               ["Total due", <strong key="t">{showMoney(a.fees.totalDue)}</strong>],
-              ["Paid", showMoney(a.fees.amountPaid)],
+              ["Paid (confirmed by Finance)", showMoney(a.fees.amountPaid)],
+              [
+                "With Finance (pending)",
+                a.financeGate.pendingCount
+                  ? `${showMoney(a.financeGate.pending)} (${a.financeGate.pendingCount} payment${a.financeGate.pendingCount === 1 ? "" : "s"})`
+                  : "—",
+              ],
               ["Balance", showMoney(a.fees.balance)],
+              [
+                "Required for evaluation",
+                <span key="g">
+                  {showMoney(a.financeGate.required)}{" "}
+                  <span className="text-gray-600">
+                    {a.financeGate.cleared ? "· confirmed" : "· not yet confirmed"}
+                  </span>
+                </span>,
+              ],
               ["Payment status", <PaymentBadge key="s" status={a.fees.paymentStatus} />],
               ["Last payment", showDate(a.fees.lastPaymentDate)],
             ]}

@@ -1,11 +1,12 @@
 import type { DataFlag } from "@/domain/flags";
 import type { PaymentStatus } from "@/domain/fees";
 import type { SlaLight } from "@/domain/sla";
-import type { Status } from "@/domain/types";
+import type { FinanceStatus, Status } from "@/domain/types";
 
 const base = "inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium";
 
 const STATUS_STYLE: Record<Status, string> = {
+  "Acknowledged - Awaiting Payment": "bg-orange-100 text-orange-900",
   "Received - Under Review": "bg-sky-100 text-sky-900",
   "Deficiency Notice Issued": "bg-amber-100 text-amber-900",
   "Provisionally Registered": "bg-violet-100 text-violet-900",
@@ -55,4 +56,20 @@ export function FlagList({ flags }: { flags: readonly DataFlag[] }) {
       ))}
     </ul>
   );
+}
+
+const FINANCE_LABEL: Record<FinanceStatus, string> = {
+  PENDING: "Pending",
+  CONFIRMED: "Confirmed",
+  REJECTED: "Rejected",
+};
+const FINANCE_STYLE: Record<FinanceStatus, string> = {
+  PENDING: "bg-amber-100 text-amber-900",
+  CONFIRMED: "bg-brand-100 text-brand-900",
+  REJECTED: "bg-red-100 text-red-900",
+};
+
+/** Finance decision on a payment (§4.12): only Confirmed counts. */
+export function FinanceBadge({ status }: { status: FinanceStatus }) {
+  return <span className={`${base} ${FINANCE_STYLE[status]}`}>{FINANCE_LABEL[status]}</span>;
 }

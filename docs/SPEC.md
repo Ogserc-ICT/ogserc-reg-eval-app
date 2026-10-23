@@ -31,7 +31,7 @@ Fees:
 - `approvedWaiver` (money), `categoryOverride` (optional category letter) + `overrideReason` (required when override differs from auto)
 
 Determination:
-- `status`*, `dateSubmissionComplete`, `deficiencyNoticeDate`, `certificateIssueDate`, `registrationNo` (locked when issued), `remarks`
+- `status`*, `releasedForEvaluationDate` (set by the Finance gate release, §4.12; locked), `dateSubmissionComplete`, `deficiencyNoticeDate`, `certificateIssueDate`, `registrationNo` (locked when issued), `remarks`
 
 \* = required at intake.
 
@@ -45,6 +45,7 @@ Determination:
 
 ### 1.4 Payment (many per Submission or per OwnUseNotification)
 - `paymentNo` (generated), `dateReceived`*, `reference` (Ack No. or OUN No.)*, `purpose`, `channel`, `amount`*, `rrr` (Remita/bank reference), `verifiedWithBank` (Y/N)
+- **Finance status** (§4.12): `Pending` (default) → `Confirmed` or `Rejected`, with who decided, when, and remarks (a rejection needs a reason). Confirming records the bank/Remita verification. A decision is final; a confirmed payment is undone only by reversal (Finance or Admin, with a reason). **Only Confirmed payments count** towards amount paid, balance, completeness and collections, for submissions and own-use notifications alike.
 
 ### 1.5 OwnUseNotification (Category I, para 3(4), form OUN-01)
 - `ounNo` (generated), `name`*, `dateFiled`*, `cacNo`, `siteAddress`, `lga`*, `natureOfBusiness`, `gridConnected` (Y/N), `distributionLicensee`, `units`, `installedCapacityKw`*, `fuel`, `avgMonthlyOutputMwh`, `contactPerson`, `phone`, `email`
@@ -54,6 +55,10 @@ Append-only. `timestamp`, `userId`, `action`, `reference` (Ack/OUN No.), `detail
 
 ### 1.7 Settings (single row, admin-editable)
 From seed `settings`: effective date, registration period (60), extension days (0), new-operator lead days (30), determination period (30), deficiency period (14), licence application period for unlicensed (90), licence expiry window (183), amber warning days (7), own-use threshold kW (200), number prefixes, and the two certificate signatory names.
+
+Finance gate policy (undecided by the Commission; admin settings, audited, applying to every submission from the moment they change, §4.12):
+- **Late charge required to release for evaluation** (default off): when on, the gate requires the total due instead of fee − waiver.
+- **Unpaid acknowledgement reminder after (days)** (default blank = no automatic action): when set, unpaid acknowledged submissions at or past that age are marked "reminder due" on the dashboard queue and counted by the daily review. No messages are sent.
 
 **Effective Date is a placeholder (22 Oct 2026).** Admin must set the gazetted date before go-live. Every deadline depends on it.
 
@@ -99,7 +104,7 @@ lateCharge = daysLate > 0
              ? late_initial + min(late_daily * daysLate, late_daily_cap)
              : 0
 totalDue   = max(0, fee - approvedWaiver) + lateCharge   # the waiver reduces the fee only, not the late charge
-amountPaid = sum(payments where reference == ackNo)
+amountPaid = sum(payments where reference == ackNo and not reversed and financeStatus == Confirmed)   # §4.12
 lastPaymentDate = max(payment.dateReceived) when amountPaid > 0
 balance    = totalDue - amountPaid
 paymentStatus = totalDue == 0 ? 'Nil'
@@ -133,6 +138,7 @@ licenceApplicationDue = licenceStatus == 'Unlicensed' ? effectiveDate + licenceA
 ```
 
 ### 2.9 Days in queue and SLA light
+(No SLA light while the status is "Acknowledged - Awaiting Payment": the clock starts after Finance confirmation, §4.12.)
 ```
 open = status not in (Registered, Refused, Lapsed, Cancelled)
 daysInQueue = open ? max(0, today - dateSubmitted) : null
@@ -158,6 +164,7 @@ Evaluate in order:
 2. Cancelled / Refused / Lapsed → "Closed – {status}" (Lapsed adds "; fresh application needed")
 3. Deficiency Notice Issued → today > response due ? "Response overdue – lapse the submission (para 13(2))" : "Await response by {date}"
 4. Provisionally Registered → "Determine and issue the certificate"
+4a. Acknowledged - Awaiting Payment (§4.12) → gate cleared ? "Payment confirmed – release for evaluation (runs automatically)" : payment with Finance ? "Payment with Finance – awaiting confirmation" : "Await payment of ₦{required − confirmed}, then Finance confirmation"
 5. Not complete → "Obtain {n} outstanding document(s)" and/or "collect ₦{balance}", then " – or issue a deficiency notice"
 6. Complete, no completion date → "Enter the Date Submission Complete"
 7. today > determinationDue → "Overdue – provisional registration applies (para 13(4))"; else "Determine by {date}"
@@ -186,6 +193,7 @@ Each condition adds a flag:
 - Licence status other than Unlicensed/pending with no licence number
 - Primary activity is generation-related and capacity ≥ 10 MW, but the applied category is not C (or A/B)
 - TIN or CAC number fails format validation
+- **Finance gate (§4.12):** "Evaluation started before Finance confirmed payment" (an evaluation start date with no release, or before the release date); "Status moved past acknowledgement without Finance confirmation" (Received, Deficiency, Provisionally Registered, Registered or Lapsed with no release date; Refused and Cancelled can be reached before release and do not raise it)
 
 ---
 
@@ -204,14 +212,14 @@ Each condition adds a flag:
 
 ## 4. Status workflow
 
-Statuses: `Received - Under Review`, `Deficiency Notice Issued`, `Provisionally Registered`, `Registered`, `Lapsed`, `Refused`, `Cancelled`.
+Statuses: `Acknowledged - Awaiting Payment` (first, §4.12), `Received - Under Review`, `Deficiency Notice Issued`, `Provisionally Registered`, `Registered`, `Lapsed`, `Refused`, `Cancelled`.
 Closed statuses: Registered, Refused, Lapsed, Cancelled.
 
 ### 4.1 Save submission (intake)
 - Validate required fields.
 - If the CAC number already exists: warn "one registration per person (para 11(4))" and require explicit confirmation.
-- Create Submission + empty DocumentChecklist + Evaluation. Status = `Received - Under Review`. Assign ack number.
-- If an evaluating officer was chosen at intake, set `dateEvaluationStarted = today`.
+- Create Submission + empty DocumentChecklist + Evaluation. Status = `Acknowledged - Awaiting Payment` (§4.12). Assign ack number.
+- An evaluating officer may be chosen at intake; `dateEvaluationStarted` is set when the submission is released for evaluation (§4.12), not at intake.
 - Audit: `New submission`, detail `{name} - Category {cat}`.
 - Offer to open the acknowledgement letter.
 
@@ -219,6 +227,7 @@ Closed statuses: Registered, Refused, Lapsed, Cancelled.
 - Reference must match an existing Ack No. or OUN No., else reject.
 - Duplicate RRR/reference → warn and require confirmation.
 - Audit: `Payment recorded`, detail `{amount} - ref {rrr}`.
+- The payment is `Pending` until Finance confirms or rejects it on the Finance Desk (§4.12).
 
 ### 4.3 Save own-use notification
 - capacity ≥ 1000 kW → reject: "register as captive generation (para 3(3)(c))".
@@ -266,6 +275,7 @@ A status in the list (para 14) with no button in the Excel. Add an admin-only ac
 
 ### 4.10 Daily review (scheduled job, plus a manual "Run now" button)
 For each submission:
+- `Acknowledged - Awaiting Payment` whose confirmed payments clear the gate (§4.12) → release for evaluation (catches missed releases, e.g. after a settings change); audit `Released for evaluation`. When the reminder setting is set, count unpaid acknowledgements at or past it.
 - `Received - Under Review` with determinationDue < today → set `Provisionally Registered` (para 13(4)); audit `Provisional registration`.
 - `Deficiency Notice Issued` with response due < today → list as overdue. The Excel asks before lapsing. In the app, show them on the dashboard for a user to lapse; do not auto-lapse.
 - Registered with no locked number → lock it (shouldn't happen if approval is transactional).
@@ -273,6 +283,7 @@ For each submission:
 Run at 06:00 Africa/Lagos.
 
 ### 4.11 Evaluation status and recommended outcome
+(While Acknowledged - Awaiting Payment and the gate is not cleared, the recommended outcome is "Awaiting Finance confirmation".)
 ```
 evaluationStatus = finalDecision ? 'Decided'
                  : !evaluatingOfficer ? 'Not assigned'
@@ -290,6 +301,22 @@ progress = (satisfied + failed + na) / 55
 fileClosed = all 7 post-approval checks are Y or N/A
 ```
 
+### 4.12 Finance confirmation gate (Commission's updated workbook)
+A submission is acknowledged first and evaluated only after Finance has confirmed payment.
+
+```
+required  = policy.lateChargeRequiredForRelease ? totalDue : max(0, fee - approvedWaiver)
+confirmed = sum(payments not reversed and Confirmed)
+cleared   = confirmed >= required
+```
+
+- **Process stage** (derived): 1 Acknowledged – awaiting payment (no payment with Finance); 2 Payment with Finance (a Pending payment); 3 Payment confirmed (cleared, release pending); 4 Evaluation and determination (released, open); 5 Closed – {status}.
+- **Finance Desk** (Finance role): pending payments, oldest first, with days waiting. **Confirm** requires ticking "verified against bank/Remita" (remarks optional); **Reject** requires a reason. The user who recorded a payment cannot confirm it (also enforced by the database). Audit `Payment confirmed` / `Payment rejected`.
+- **Release:** when a confirmation (or a waiver, or a settings change) clears the gate of an `Acknowledged - Awaiting Payment` submission, in the same transaction: status → `Received - Under Review`, `releasedForEvaluationDate = today`, `dateEvaluationStarted = today` if an evaluating officer is assigned and it is empty; audit `Released for evaluation`. The daily review releases any that were missed.
+- **Gate:** while not cleared, these are blocked and **every blocked attempt is audited** (`Blocked - awaiting Finance confirmation`, with the action and the amounts): opening the evaluation (open submissions), saving checks, recording the review, mark complete, deficiency notice (issue and draft), approval, the evaluation form PDF and the certificate PDF. **Refusal stays available**, as do show-cause, cancel and officer assignment. A later reversal of a confirmed payment closes the gate again (the status stays as released).
+- **Reopen decision:** a Refused or Cancelled submission that was never released goes back to `Acknowledged - Awaiting Payment`.
+- **Existing records** (data migration): every submission not yet closed with no Confirmed payment returns to `Acknowledged - Awaiting Payment`, one audit entry each; payments recorded before the gate are Pending. A dry run (`npm run finance-gate:dry-run`) lists the effect first.
+
 ---
 
 ## 5. Roles and separation of duties (new; the Excel has none)
@@ -297,7 +324,7 @@ fileClosed = all 7 post-approval checks are Y or N/A
 | Role | Can do |
 |---|---|
 | Registry Officer | Intake, documents checklist, record payments, own-use notifications, print acknowledgement letters |
-| Finance Officer | Record payments, mark payments verified with bank |
+| Finance Officer | Record payments; confirm or reject payments on the Finance Desk (not ones they recorded, §4.12); reverse payments |
 | Evaluating Officer | Complete evaluation checks on assigned submissions, mark complete, draft deficiency notices |
 | Reviewing Supervisor | Review evaluations, issue deficiency notices, lapse |
 | Approving Officer | Approve and register, refuse |
@@ -410,7 +437,7 @@ Evaluation: in progress, ready for decision, decided, not assigned.
 Money: total due (fees + late charges), collected, collected and bank-verified, outstanding, collection rate.
 Breakdowns: by Schedule 3 category (submissions, registered, fees, late charges, waivers, collected, outstanding; Category I comes from own-use notifications); by status; by primary activity code; by principal LGA (registrants + own-use); monthly intake for 12 months from the Effective Date month (submissions, registered by certificate date, collected by payment date).
 
-Also show work queues: my assigned evaluations, overdue deficiency responses awaiting lapse, ready for decision.
+Also show work queues: my assigned evaluations, overdue deficiency responses awaiting lapse, ready for decision, and **awaiting payment, oldest first** (days since acknowledgement, process stage, "reminder due" when the setting applies, §4.12). Submissions awaiting payment are counted on their own ("Awaiting payment") and stay out of the evaluation counts and queues. Money: collected counts Finance-confirmed payments only; payments still with Finance are shown separately.
 
 ---
 
@@ -434,3 +461,7 @@ Also show work queues: my assigned evaluations, overdue deficiency responses awa
 | Approval blockers | each missing officer / pending check / failed check / incomplete | approval refused with every reason listed |
 | Separation | approver == evaluator | approval refused |
 | Reg serial | 3 certificates in 2026, 1 in 2027 | .../0001–0003 then 2027/.../0001 |
+| Finance gate | New submission; ₦250k fee recorded | "Acknowledged - Awaiting Payment", stage 2, amount paid ₦0, evaluation and approval blocked (attempts audited) |
+| Finance gate | ₦100k confirmed, then ₦150k confirmed (fee ₦250k) | not released after the first; released ("Received - Under Review") by the second, in the same transaction |
+| Finance gate | Fee confirmed, late charge unpaid | released by default; not released when "late charge required to release" is on |
+| Separation | Finance officer confirms a payment they recorded | refused |

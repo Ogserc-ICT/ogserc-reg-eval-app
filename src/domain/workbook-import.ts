@@ -16,6 +16,7 @@ import {
   FINAL_DECISION,
   STATUS,
   STATUSES,
+  isClosed,
   type CheckValue,
   type FinalDecision,
   type IsoDate,
@@ -649,6 +650,24 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
         `Category override ${categoryOverride} (auto ${auto ?? "none"}) has no reason in the workbook`,
       );
 
+    // Finance confirmation gate (§4.12): imported payments start Pending, so a record that is not
+    // closed comes in acknowledged and waits for Finance like a new one.
+    let importStatus = status!;
+    if (!isClosed(importStatus) && importStatus !== STATUS.AWAITING) {
+      warn(
+        r.row,
+        ackNo,
+        `Imported as "${STATUS.AWAITING}" (workbook status: ${importStatus}); Finance must confirm its payments to release it for evaluation`,
+      );
+      importStatus = STATUS.AWAITING;
+    } else if (importStatus === STATUS.REGISTERED || importStatus === STATUS.LAPSED) {
+      warn(
+        r.row,
+        ackNo,
+        `Imported as ${importStatus} without Finance confirmation; the record will show the flag "Status moved past acknowledgement without Finance confirmation"`,
+      );
+    }
+
     const planned: PlannedSubmission = {
       row: r.row,
       ackNo,
@@ -678,7 +697,7 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
         approvedWaiver,
         categoryOverride,
         overrideReason,
-        status: status!,
+        status: importStatus,
         dateSubmissionComplete,
         deficiencyNoticeDate,
         certificateIssueDate,
@@ -884,7 +903,13 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
   const paymentsByRef = new Map<string, PaymentInput[]>();
   for (const p of plan.payments) {
     const list = paymentsByRef.get(p.reference) ?? [];
-    list.push({ reference: p.reference, amount: p.amount, dateReceived: p.dateReceived });
+    // Imported payments are Pending until Finance confirms them; only the fee comparison uses them.
+    list.push({
+      reference: p.reference,
+      amount: p.amount,
+      dateReceived: p.dateReceived,
+      financeStatus: "PENDING",
+    });
     paymentsByRef.set(p.reference, list);
   }
   const regRows = new Map(wb.register.map((r) => [r.row, r]));
@@ -982,6 +1007,8 @@ function toSubmissionInput(
     remarks: d.remarks,
     documents: s.documents.map((v) => v ?? null) as CheckValue[],
     pricing: s.pricing,
+    releasedForEvaluationDate: null,
+    dateEvaluationStarted: s.evaluation.dateEvaluationStarted,
   };
 }
 

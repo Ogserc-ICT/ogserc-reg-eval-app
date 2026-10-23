@@ -22,6 +22,12 @@ export function nextAction(sub: SubmissionInput, a: Assessment, today: IsoDate):
         : "Await response";
     case STATUS.PROVISIONAL:
       return "Determine and issue the certificate";
+    case STATUS.AWAITING: {
+      const gate = a.financeGate;
+      if (gate.cleared) return "Payment confirmed – release for evaluation (runs automatically)";
+      if (gate.pendingCount > 0) return "Payment with Finance – awaiting confirmation";
+      return `Await payment of ${formatNaira(Math.max(0, gate.required - gate.confirmed))}, then Finance confirmation`;
+    }
   }
 
   if (!a.submissionComplete) {

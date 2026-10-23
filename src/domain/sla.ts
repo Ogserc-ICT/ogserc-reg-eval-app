@@ -21,10 +21,14 @@ export interface SlaInput {
   deficiencyResponseDue: IsoDate | null;
 }
 
-/** §2.9 traffic light. */
+/**
+ * §2.9 traffic light. None while acknowledged and awaiting payment: the determination clock has not
+ * started until Finance confirms payment (§4.12).
+ */
 export function slaLight(input: SlaInput, today: IsoDate, settings: Settings): SlaLight | null {
   const { status, determinationDue, deficiencyResponseDue } = input;
-  if (input.daysInQueue === null || status === STATUS.PROVISIONAL) return null;
+  if (input.daysInQueue === null || status === STATUS.PROVISIONAL || status === STATUS.AWAITING)
+    return null;
   if (
     (determinationDue && today > determinationDue) ||
     (status === STATUS.DEFICIENCY && deficiencyResponseDue && today > deficiencyResponseDue)

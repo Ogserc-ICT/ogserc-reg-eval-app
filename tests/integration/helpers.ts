@@ -112,3 +112,20 @@ export function asWorkflow<T>(db: PrismaClient, fn: (tx: Prisma.TransactionClien
     return fn(tx);
   });
 }
+
+/**
+ * §4.12: have a Finance officer (not the recorder) confirm every pending payment on a reference, as
+ * the Finance Desk does. Releases the submission for evaluation when that clears the gate.
+ */
+export async function confirmPayments(db: PrismaClient, reference: string, today?: string) {
+  const { confirmPayment } = await import("@/server/finance");
+  const finance = await makeUser(db, ["FINANCE_OFFICER"]);
+  const pending = await db.payment.findMany({
+    where: { reference, status: "ACTIVE", financeStatus: "PENDING" },
+    orderBy: { paymentSeq: "asc" },
+  });
+  for (const p of pending) {
+    await confirmPayment(db, finance, p.id, { verified: true, remarks: "" }, { today });
+  }
+  return finance;
+}

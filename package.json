@@ -25,7 +25,8 @@
     "seed:fake": "tsx scripts/seed-fake.ts",
     "perf:dashboard": "tsx scripts/perf-dashboard.ts",
     "smoke:standalone": "tsx scripts/smoke-standalone.ts",
-    "vercel-build": "tsx scripts/vercel-build.ts"
+    "vercel-build": "tsx scripts/vercel-build.ts",
+    "finance-gate:dry-run": "tsx scripts/finance-gate-dry-run.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

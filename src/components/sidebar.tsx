@@ -11,6 +11,7 @@ const NAV: { href: string; label: string; permission: Permission }[] = [
   { href: "/submissions", label: "Register", permission: "records.read" },
   { href: "/own-use", label: "Own-use notifications", permission: "records.read" },
   { href: "/payments", label: "Payments", permission: "records.read" },
+  { href: "/finance", label: "Finance Desk", permission: "payment.confirm" },
   { href: "/evaluations", label: "Evaluations", permission: "records.read" },
   { href: "/audit", label: "Audit log", permission: "audit.read" },
   { href: "/admin", label: "Admin", permission: "admin.users" },

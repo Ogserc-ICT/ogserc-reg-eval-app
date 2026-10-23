@@ -47,13 +47,17 @@ const form = (name: string, cac: string) => ({
   evaluatingOfficerId: "",
 });
 
-/** Complete on 22 Oct 2026, so determination is due 21 November 2026. */
+/** Released and complete on 22 Oct 2026, so determination is due 21 November 2026. */
 async function completeSubmission(name: string, cac: string) {
   const sub = await createSubmission(db, registry, form(name, cac));
   await asWorkflow(db, (tx) =>
     tx.submission.update({
       where: { id: sub.id },
-      data: { dateSubmissionComplete: fromIsoDate("2026-10-22") },
+      data: {
+        status: "RECEIVED",
+        releasedForEvaluationDate: fromIsoDate("2026-10-22"),
+        dateSubmissionComplete: fromIsoDate("2026-10-22"),
+      },
     }),
   );
   return sub;

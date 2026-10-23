@@ -245,6 +245,7 @@ export async function getOwnUseDetail(db: Db, id: string, today?: string) {
         include: {
           recordedBy: { select: { name: true } },
           verifiedBy: { select: { name: true } },
+          financeDecidedBy: { select: { name: true } },
           reversedBy: { select: { name: true } },
         },
       },

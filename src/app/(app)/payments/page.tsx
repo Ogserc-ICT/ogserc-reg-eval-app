@@ -20,7 +20,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const q = one(sp.q).trim();
   const status = one(sp.status);
-  const verified = one(sp.verified);
+  const finance = one(sp.finance);
   const channel = one(sp.channel);
 
   const where: Prisma.PaymentWhereInput = {
@@ -32,11 +32,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       ],
     }),
     ...(status === "ACTIVE" || status === "REVERSED" ? { status } : {}),
-    ...(verified === "yes"
-      ? { verifiedWithBank: true }
-      : verified === "no"
-        ? { verifiedWithBank: false }
-        : {}),
+    ...(finance === "PENDING" || finance === "CONFIRMED" || finance === "REJECTED"
+      ? { financeStatus: finance }
+      : {}),
     ...(channel && { channel }),
   };
   const [payments, options] = await Promise.all([
@@ -47,6 +45,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       include: {
         recordedBy: { select: { name: true } },
         verifiedBy: { select: { name: true } },
+        financeDecidedBy: { select: { name: true } },
         reversedBy: { select: { name: true } },
       },
     }),
@@ -62,10 +61,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         : null,
   }));
   const active = rows.filter((r) => r.status === "ACTIVE");
-  const total = active.reduce((s, r) => s + r.amountKobo, 0);
-  const verifiedTotal = active
-    .filter((r) => r.verifiedWithBank)
-    .reduce((s, r) => s + r.amountKobo, 0);
+  const sumOf = (status: string) =>
+    active.filter((r) => r.financeStatus === status).reduce((s, r) => s + r.amountKobo, 0);
 
   const select = (name: string, label: string, choices: { value: string; label: string }[]) => (
     <label className="text-xs text-gray-600">
@@ -121,9 +118,10 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           { value: "ACTIVE", label: "Active" },
           { value: "REVERSED", label: "Reversed" },
         ])}
-        {select("verified", "Bank verification", [
-          { value: "yes", label: "Verified" },
-          { value: "no", label: "Not verified" },
+        {select("finance", "Finance", [
+          { value: "PENDING", label: "Pending" },
+          { value: "CONFIRMED", label: "Confirmed" },
+          { value: "REJECTED", label: "Rejected" },
         ])}
         {select(
           "channel",
@@ -141,8 +139,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             Clear
           </Link>
           <span className="ml-auto text-sm text-gray-600">
-            Shown: {active.length} active payments, {showMoney(total)} ({showMoney(verifiedTotal)}{" "}
-            verified)
+            Shown: {active.length} active payments · confirmed {showMoney(sumOf("CONFIRMED"))} ·
+            pending {showMoney(sumOf("PENDING"))}
           </span>
         </div>
       </form>

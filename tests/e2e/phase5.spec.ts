@@ -51,9 +51,12 @@ test.describe.serial("Phase 5: documents", () => {
       /^attachment; filename="OGSERC-ACK-\d{4}-\d{5}-acknowledgement-v1\.pdf"$/,
     );
 
+    // §4.12: the evaluation form waits for Finance to confirm payment.
     await page.getByRole("button", { name: "Print evaluation form (EVAL-01)" }).click();
-    await expect(page.getByText("Evaluation form v1 generated.")).toBeVisible();
-    await expect(page.getByRole("row", { name: /Evaluation form \(EVAL-01\) v1/ })).toBeVisible();
+    await expect(
+      page.getByText("Evaluation form is not available until Finance confirms payment."),
+    ).toBeVisible();
+    await expect(page.getByRole("row", { name: /Evaluation form \(EVAL-01\) v1/ })).toHaveCount(0);
   });
 
   test("documents cannot be fetched when signed out", async ({ browser }) => {

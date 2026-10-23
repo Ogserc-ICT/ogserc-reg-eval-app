@@ -49,11 +49,14 @@ function Queue({
   items,
   empty,
   detail,
+  href = (item) => `/submissions/${item.id}/evaluation`,
 }: {
   title: string;
   items: QueueItem[];
   empty: string;
   detail: (item: QueueItem) => string;
+  /** Where each item leads (default: its evaluation). */
+  href?: (item: QueueItem) => string;
 }) {
   return (
     <section aria-label={title} className="min-w-0 rounded border border-gray-200 bg-white">
@@ -67,10 +70,7 @@ function Queue({
         <ul className="max-h-64 divide-y divide-gray-100 overflow-y-auto">
           {items.map((item) => (
             <li key={item.id} className="px-3 py-2 text-sm">
-              <Link
-                href={`/submissions/${item.id}/evaluation`}
-                className="text-brand-700 font-medium hover:underline"
-              >
+              <Link href={href(item)} className="text-brand-700 font-medium hover:underline">
                 {item.name}
               </Link>
               <span className="block text-xs text-gray-500">
@@ -203,6 +203,17 @@ export default async function DashboardPage({
         />
       </div>
 
+      <Queue
+        title="Awaiting payment, oldest first"
+        items={queues.awaitingPayment}
+        empty="No submissions are waiting for payment."
+        href={(i) => `/submissions/${i.id}`}
+        detail={(i) =>
+          `${i.daysWaiting} day${i.daysWaiting === 1 ? "" : "s"} since acknowledgement · ${i.stage}` +
+          (i.reminderDue ? " · Reminder due" : "")
+        }
+      />
+
       <Section title="Key dates">
         <div className="grid gap-3 sm:grid-cols-3">
           <StatTile
@@ -223,8 +234,14 @@ export default async function DashboardPage({
       </Section>
 
       <Section title="Submissions">
-        <div className="grid gap-3 sm:grid-cols-4 xl:grid-cols-7">
+        <div className="grid gap-3 sm:grid-cols-4 xl:grid-cols-8">
           <StatTile label="Total" value={count(d.submissions.total)} href="/submissions" />
+          <StatTile
+            label="Awaiting payment"
+            value={count(d.submissions.awaitingPayment)}
+            hint="Acknowledged; waiting for Finance to confirm payment"
+            href={`/submissions?status=${encodeURIComponent("Acknowledged - Awaiting Payment")}`}
+          />
           <StatTile
             label="Registered"
             value={count(d.submissions.registered)}
@@ -325,13 +342,18 @@ export default async function DashboardPage({
           <StatTile
             label="Collected"
             value={formatNaira(d.money.collected)}
-            hint="Every payment received"
-            href="/payments?status=ACTIVE"
+            hint="Every payment confirmed by Finance"
+            href="/payments?status=ACTIVE&finance=CONFIRMED"
           />
           <StatTile
-            label="Collected and bank-verified"
-            value={formatNaira(d.money.verified)}
-            href="/payments?status=ACTIVE&verified=yes"
+            label="With Finance"
+            value={formatNaira(d.money.withFinance)}
+            hint={`${count(d.money.withFinanceCount)} payment(s) recorded, awaiting confirmation; not counted as collected`}
+            href={
+              can(user.roles, "payment.confirm")
+                ? "/finance"
+                : "/payments?status=ACTIVE&finance=PENDING"
+            }
           />
           <StatTile
             label="Outstanding"

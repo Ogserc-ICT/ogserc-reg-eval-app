@@ -53,6 +53,8 @@ export interface RegisterRow {
   registeredName: string;
   dateSubmitted: string;
   status: Status;
+  /** Derived process stage (§4.12), e.g. "2. Payment with Finance". */
+  stage: string;
   category: string | null;
   activityCode: string | null;
   principalLga: string;
@@ -113,6 +115,7 @@ export async function assessRegister(db: Db, filters: RegisterFilters = {}, toda
       registeredName: sub.registeredName!,
       dateSubmitted: sub.dateSubmitted!,
       status: sub.status!,
+      stage: `${a.processStage.stage}. ${a.processStage.label}`,
       category: a.categoryApplied,
       activityCode: a.primaryCode,
       principalLga: sub.principalLga!,

@@ -93,32 +93,10 @@ export async function recordPayment(
   });
 }
 
-/** Finance: mark a payment as confirmed against the bank statement. */
-export async function verifyPayment(db: Db, actor: Actor, paymentId: string) {
-  if (!can(actor.roles, "payment.verify")) throw new ForbiddenError();
-  return db.$transaction(async (tx) => {
-    const payment = await tx.payment.findUnique({ where: { id: paymentId } });
-    if (!payment) throw new NotFoundError("Payment not found.");
-    if (payment.status === "REVERSED")
-      throw new ValidationError("A reversed payment cannot be verified.");
-    if (payment.verifiedWithBank) return payment;
-    const updated = await tx.payment.update({
-      where: { id: paymentId },
-      data: { verifiedWithBank: true, verifiedById: actor.id, verifiedAt: new Date() },
-    });
-    await writeAudit(tx, {
-      userId: actor.id,
-      action: "Payment verified with bank",
-      reference: payment.reference,
-      detail: `${payment.paymentNo} ${formatNaira(koboToNumber(payment.amount))}`,
-    });
-    return updated;
-  });
-}
-
 /**
- * Finance or Admin: reverse a payment recorded in error. The row stays (visible, marked reversed,
- * with who, when and why) and stops counting towards totals. A reversal is final.
+ * Finance or Admin: reverse a payment recorded in error, including a confirmed one (§4.12). The row
+ * stays (visible, marked reversed, with who, when and why) and stops counting towards totals. A
+ * reversal is final.
  */
 export async function reversePayment(db: Db, actor: Actor, paymentId: string, input: unknown) {
   if (!can(actor.roles, "payment.reverse")) throw new ForbiddenError();
@@ -130,6 +108,8 @@ export async function reversePayment(db: Db, actor: Actor, paymentId: string, in
     if (!payment) throw new NotFoundError("Payment not found.");
     if (payment.status === "REVERSED")
       throw new ValidationError("This payment is already reversed.");
+    if (payment.financeStatus === "REJECTED")
+      throw new ValidationError("A rejected payment never counted; there is nothing to reverse.");
 
     const updated = await tx.payment.update({
       where: { id: paymentId },

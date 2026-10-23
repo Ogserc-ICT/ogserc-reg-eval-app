@@ -73,7 +73,7 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     await expect(page.getByText(/^OGSERC\/ACK\/\d{4}\/00001$/)).toBeVisible();
     await expect(page.getByText("E – Mini-grids and interconnected mini-grids")).toBeVisible();
     await expect(nextAction(page)).toContainText(
-      "Obtain 13 outstanding document(s) and collect ₦250,000 – or issue a deficiency notice",
+      "Await payment of ₦250,000, then Finance confirmation",
     );
   });
 
@@ -88,7 +88,10 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     }
     await page.getByRole("button", { name: "Save checklist" }).click();
     await expect(page.getByRole("status")).toContainText("Checklist saved (13 changes)");
-    await expect(nextAction(page)).toContainText("Collect ₦250,000 – or issue a deficiency notice");
+    // Awaiting payment (§4.12): documents do not move it on until Finance confirms the fee.
+    await expect(nextAction(page)).toContainText(
+      "Await payment of ₦250,000, then Finance confirmation",
+    );
 
     await page.getByRole("link", { name: "Record payment" }).click();
     await expect(page.getByLabel(/^Ack No\. or OUN No\./)).toHaveValue(/OGSERC\/ACK\/\d{4}\/00001/);
@@ -97,8 +100,10 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     await page.getByRole("button", { name: "Record payment" }).click();
 
     await expect(page.getByText("Payment recorded.")).toBeVisible();
-    await expect(page.getByText("Paid", { exact: true }).first()).toBeVisible();
-    await expect(nextAction(page)).toContainText("Enter the Date Submission Complete");
+    // §4.12: recorded payments wait for Finance; they count once confirmed.
+    await expect(page.getByText("Pending", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Stage 2:")).toBeVisible();
+    await expect(nextAction(page)).toContainText("Payment with Finance – awaiting confirmation");
   });
 
   test("a CAC number already on the Register needs confirmation (para 11(4))", async ({
@@ -123,9 +128,11 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     await expect(page.getByRole("link", { name: /\/00002$/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /\/00001$/ })).toHaveCount(0);
 
-    await page.goto("/submissions?payment=Paid");
+    // The recorded payment is not confirmed yet, so 00001 is still unpaid.
+    await page.goto("/submissions?payment=Unpaid");
     await expect(page.getByRole("link", { name: /\/00001$/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: /\/00002$/ })).toHaveCount(0);
+    await page.goto("/submissions?payment=Paid");
+    await expect(page.getByRole("link", { name: /\/00001$/ })).toHaveCount(0);
   });
 
   test("finance reverses a payment with a reason; it stays visible and stops counting", async ({

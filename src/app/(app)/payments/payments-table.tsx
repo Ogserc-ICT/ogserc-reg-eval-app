@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { FinanceBadge } from "@/components/badges";
 import { can, type Role } from "@/domain/roles";
+import type { FinanceStatus } from "@/domain/types";
 import { showDate, showMoney, showText } from "@/lib/format";
 import { toIsoDate } from "@/server/reference-data";
-import { reversePaymentAction, verifyPaymentAction } from "./actions";
+import { reversePaymentAction } from "./actions";
 import { PaymentRowActions } from "./payment-row-actions";
 
 export interface PaymentTableRow {
@@ -16,16 +18,22 @@ export interface PaymentTableRow {
   channel: string | null;
   amountKobo: number;
   rrr: string | null;
-  verifiedWithBank: boolean;
-  verifiedBy?: { name: string } | null;
   status: "ACTIVE" | "REVERSED";
+  /** Finance decision (§4.12): only Confirmed counts. */
+  financeStatus: FinanceStatus;
+  financeDecidedAt: Date | null;
+  financeDecidedBy?: { name: string } | null;
+  financeRemarks: string | null;
   reversalReason: string | null;
   reversedAt: Date | null;
   reversedBy?: { name: string } | null;
   recordedBy?: { name: string } | null;
 }
 
-/** Payment rows; reversed ones stay visible, struck through, with who, when and why. */
+/**
+ * Payment rows with their Finance status; reversed ones stay visible, struck through, with who, when
+ * and why. Confirming or rejecting happens on the Finance Desk.
+ */
 export function PaymentsTable({
   rows,
   roles,
@@ -36,7 +44,7 @@ export function PaymentsTable({
   showReference?: boolean;
 }) {
   if (!rows.length) return <p className="text-sm text-gray-500">No payments recorded.</p>;
-  const canVerify = can(roles, "payment.verify");
+  const canConfirm = can(roles, "payment.confirm");
   const canReverse = can(roles, "payment.reverse");
   return (
     <div className="overflow-x-auto">
@@ -49,7 +57,7 @@ export function PaymentsTable({
             <th className="py-1 pr-2 text-right font-normal">Amount</th>
             <th className="py-1 pr-2 font-normal">Channel / RRR</th>
             <th className="py-1 pr-2 font-normal">Purpose</th>
-            <th className="py-1 pr-2 font-normal">Bank</th>
+            <th className="py-1 pr-2 font-normal">Finance</th>
             <th className="py-1 font-normal">Actions</th>
           </tr>
         </thead>
@@ -91,19 +99,24 @@ export function PaymentsTable({
                   {p.rrr && <span className="block text-xs text-gray-500">{p.rrr}</span>}
                 </td>
                 <td className="py-1.5 pr-2">{showText(p.purpose)}</td>
-                <td className="py-1.5 pr-2 whitespace-nowrap">
-                  {p.verifiedWithBank
-                    ? `Verified${p.verifiedBy ? ` (${p.verifiedBy.name})` : ""}`
-                    : "Not verified"}
+                <td className="py-1.5 pr-2">
+                  <FinanceBadge status={p.financeStatus} />
+                  {p.financeStatus !== "PENDING" && (
+                    <span className="block text-xs text-gray-500">
+                      {p.financeDecidedBy?.name}
+                      {p.financeDecidedAt ? `, ${showDate(toIsoDate(p.financeDecidedAt))}` : ""}
+                      {p.financeRemarks ? `: ${p.financeRemarks}` : ""}
+                    </span>
+                  )}
+                  {p.financeStatus === "PENDING" && !reversed && canConfirm && (
+                    <Link href="/finance" className="text-brand-700 block text-xs hover:underline">
+                      Finance Desk
+                    </Link>
+                  )}
                 </td>
                 <td className="py-1.5">
-                  {!reversed && (canVerify || canReverse) && (
-                    <PaymentRowActions
-                      verify={verifyPaymentAction.bind(null, p.id)}
-                      reverse={reversePaymentAction.bind(null, p.id)}
-                      canVerify={canVerify && !p.verifiedWithBank}
-                      canReverse={canReverse}
-                    />
+                  {!reversed && p.financeStatus !== "REJECTED" && canReverse && (
+                    <PaymentRowActions reverse={reversePaymentAction.bind(null, p.id)} />
                   )}
                 </td>
               </tr>

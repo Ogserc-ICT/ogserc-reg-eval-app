@@ -6,6 +6,7 @@ import { formatNaira } from "@/domain/money";
 import { deficiencyNoticeRef } from "@/domain/numbers";
 import { ROLE_LABELS, can, canEditChecks, type Role } from "@/domain/roles";
 import { STATUS, isClosed, type IsoDate } from "@/domain/types";
+import { gateReason } from "@/domain/finance";
 import {
   REFUSAL_GROUNDS,
   approvalBlockers,
@@ -32,6 +33,7 @@ import {
 } from "./errors";
 import { storeCertificate, storeDeficiencyNotice } from "./documents";
 import { loadEvaluationState, type EvaluationState } from "./evaluation-state";
+import { requireFinanceGate } from "./finance";
 import { fromIsoDate, toIsoDate } from "./reference-data";
 import type { Actor, Db, Tx } from "./types";
 
@@ -63,6 +65,19 @@ async function stateFor(tx: Tx, id: string, today: IsoDate) {
 
 function blockIf(reasons: string[], message: string) {
   if (reasons.length) throw new BlockedError(message, reasons);
+}
+
+/**
+ * §4.12 inside the transaction: the gate is checked (and a blocked attempt audited) before it by
+ * `requireFinanceGate`; this re-checks against committed data, e.g. a reversal in between.
+ */
+function assertReleased(state: EvaluationState, action: string) {
+  const gate = state.assessment.financeGate;
+  if (!gate.cleared || state.sub.status === STATUS.AWAITING) {
+    throw new BlockedError(`${action} is not available until Finance confirms payment.`, [
+      gateReason(gate),
+    ]);
+  }
 }
 
 /**
@@ -164,8 +179,12 @@ export async function assignOfficers(
       where: { submissionId: id },
       data: {
         ...next,
+        // Evaluation starts on assignment only once released (§4.12); the release dates it otherwise.
         dateEvaluationStarted:
-          before.dateEvaluationStarted ?? (next.evaluatingOfficerId ? fromIsoDate(today) : null),
+          before.dateEvaluationStarted ??
+          (next.evaluatingOfficerId && state.row.releasedForEvaluationDate
+            ? fromIsoDate(today)
+            : null),
       },
     });
     await writeAudit(tx, {
@@ -204,8 +223,10 @@ export async function saveChecks(
   if (!parsed.success) throw ValidationError.fromZod(parsed.error);
   const today = opts.today ?? appToday();
 
+  await requireFinanceGate(db, actor, id, "Evaluation", today);
   return inTx(db, async (tx) => {
     const { state } = await stateFor(tx, id, today);
+    assertReleased(state, "Evaluation");
     if (!canEditChecks(actor, state.evaluation.evaluatingOfficerId)) {
       throw new ForbiddenError(
         "Only the assigned evaluating officer or a reviewing supervisor can edit these checks.",
@@ -263,8 +284,10 @@ export async function saveChecks(
 export async function recordReview(db: Db, actor: Actor, id: string, opts: WorkflowOptions = {}) {
   assertCan(actor, "evaluation.review");
   const today = opts.today ?? appToday();
+  await requireFinanceGate(db, actor, id, "Evaluation review", today);
   return inTx(db, async (tx) => {
     const { state } = await stateFor(tx, id, today);
+    assertReleased(state, "Evaluation review");
     const reasons: string[] = [];
     if (state.evaluation.reviewingSupervisorId !== actor.id) {
       reasons.push("Only the assigned reviewing supervisor can record the review");
@@ -307,8 +330,10 @@ export async function markSubmissionComplete(
 ) {
   assertCan(actor, "submission.markComplete");
   const today = opts.today ?? appToday();
+  await requireFinanceGate(db, actor, id, "Mark complete", today);
   return inTx(db, async (tx) => {
     const { ctx, state } = await stateFor(tx, id, today);
+    assertReleased(state, "Mark complete");
     requireAssignedEvaluatorOrSupervisor(actor, state);
     const { sub, assessment } = state;
     blockIf(
@@ -365,8 +390,10 @@ export async function issueDeficiency(
 ) {
   assertCan(actor, "deficiency.issue");
   const today = opts.today ?? appToday();
+  await requireFinanceGate(db, actor, id, "Deficiency notice", today);
   return inTx(db, async (tx) => {
     const { ctx, state } = await stateFor(tx, id, today);
+    assertReleased(state, "Deficiency notice");
     const { sub, assessment: a } = state;
     const check = deficiencyNoticeCheck(sub.status, state.counts, a.submissionComplete);
     const unresolved = await openNotice(tx, id);
@@ -446,8 +473,10 @@ export async function approveAndRegister(
   if (!parsed.success) throw ValidationError.fromZod(parsed.error);
   const today = opts.today ?? appToday();
 
+  await requireFinanceGate(db, actor, id, "Approval", today);
   return inTx(db, async (tx) => {
     const { ctx, state } = await stateFor(tx, id, today);
+    assertReleased(state, "Approval");
     const override = parsed.data.flagOverrideReason ?? state.evaluation.flagOverrideReason;
     const { counts } = state.checksFor(override);
     const approval = {
@@ -655,7 +684,7 @@ export async function cancelSubmission(
 
 /**
  * Admin: reopen a decision made in error, with a reason. Refused, Lapsed and Cancelled records go back
- * to where the decision found them; a Registered decision cannot be reopened (its number is locked:
+ * to where the decision found them (awaiting payment if never released for evaluation); a Registered decision cannot be reopened (its number is locked:
  * cancel it instead, para 14).
  */
 export async function reopenDecision(
@@ -683,9 +712,17 @@ export async function reopenDecision(
     }
     const unresolved = await openNotice(tx, id);
     const reinstate = status === STATUS.CANCELLED && !!row.registrationNo;
-    const next = reinstate ? "REGISTERED" : unresolved ? "DEFICIENCY" : "RECEIVED";
+    // A submission refused (or cancelled) before release goes back to waiting for payment (§4.12).
+    const next = reinstate
+      ? "REGISTERED"
+      : !row.releasedForEvaluationDate
+        ? "AWAITING_PAYMENT"
+        : unresolved
+          ? "DEFICIENCY"
+          : "RECEIVED";
     const nextLabel = {
       REGISTERED: STATUS.REGISTERED,
+      AWAITING_PAYMENT: STATUS.AWAITING,
       DEFICIENCY: STATUS.DEFICIENCY,
       RECEIVED: STATUS.RECEIVED,
     }[next];

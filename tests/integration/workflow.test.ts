@@ -25,7 +25,7 @@ import {
   reopenDecision,
   saveChecks,
 } from "@/server/workflow";
-import { asWorkflow, makeUser, resetDb, testDb } from "./helpers";
+import { asWorkflow, confirmPayments, makeUser, resetDb, testDb } from "./helpers";
 
 const db = testDb();
 afterAll(() => db.$disconnect());
@@ -94,13 +94,16 @@ const assignAll = (id: string, o: Partial<Record<"e" | "s" | "a", string>> = {})
     approvingOfficerId: o.a ?? approver.id,
   });
 
-async function completeDocsAndPay(id: string, ackNo: string) {
-  await updateDocuments(
+const completeDocs = (id: string) =>
+  updateDocuments(
     db,
     registry,
     id,
     Object.fromEntries(Array.from({ length: 13 }, (_, i) => [String(i + 1), "Y"])),
   );
+
+/** Record the ₦250,000 fee and have Finance confirm it (§4.12), which releases the submission. */
+async function payAndConfirm(ackNo: string) {
   await recordPayment(db, registry, {
     dateReceived: TODAY,
     reference: ackNo,
@@ -109,6 +112,19 @@ async function completeDocsAndPay(id: string, ackNo: string) {
     amount: "250000",
     rrr: "",
   });
+  await confirmPayments(db, ackNo, TODAY);
+}
+
+async function completeDocsAndPay(id: string, ackNo: string) {
+  await completeDocs(id);
+  await payAndConfirm(ackNo);
+}
+
+/** A submission whose fee Finance has confirmed: released for evaluation, documents outstanding. */
+async function released(overrides: Record<string, string> = {}) {
+  const sub = await newSubmission(overrides);
+  await payAndConfirm(sub.ackNo);
+  return sub;
 }
 
 /** Every manual decision check answered (Y unless overridden). */
@@ -141,7 +157,7 @@ async function readyForApproval() {
 
 describe("assignOfficers", () => {
   it("assigns by role, starts the evaluation date and audits names", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await assignAll(sub.id);
     const ev = await db.evaluation.findUniqueOrThrow({ where: { submissionId: sub.id } });
     expect(ev).toMatchObject({
@@ -176,7 +192,7 @@ describe("assignOfficers", () => {
 
 describe("saveChecks (EVAL-01)", () => {
   it("lets the assigned evaluator or a supervisor answer manual checks, never automatic ones", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await assignAll(sub.id);
     await saveChecks(db, evaluator, sub.id, {
       values: { "2.1": "Y", "2.2": "N" },
@@ -200,13 +216,14 @@ describe("saveChecks (EVAL-01)", () => {
 
 describe("markSubmissionComplete (§4.4)", () => {
   it("lists what is outstanding instead of changing anything", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await assignAll(sub.id);
     const err = await markSubmissionComplete(db, evaluator, sub.id, { today: TODAY }).catch(
       (e) => e,
     );
     expect(err).toBeInstanceOf(BlockedError);
-    expect(err.reasons).toContain("Unpaid: ₦250,000");
+    // The fee is confirmed (it had to be, to get here); the documents are not.
+    expect(err.reasons.filter((r: string) => r.startsWith("Unpaid"))).toEqual([]);
     expect(err.reasons.filter((r: string) => r.startsWith("Outstanding:"))).toHaveLength(13);
     expect(
       (await db.submission.findUniqueOrThrow({ where: { id: sub.id } })).dateSubmissionComplete,
@@ -214,10 +231,10 @@ describe("markSubmissionComplete (§4.4)", () => {
   });
 
   it("starts the determination clock, and a completed deficiency response returns to review", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await assignAll(sub.id);
     await issueDeficiency(db, supervisor, sub.id, { today: TODAY });
-    await completeDocsAndPay(sub.id, sub.ackNo);
+    await completeDocs(sub.id);
     await markSubmissionComplete(db, evaluator, sub.id, { today: "2026-10-25" });
     const row = await db.submission.findUniqueOrThrow({ where: { id: sub.id } });
     expect(row.status).toBe("RECEIVED");
@@ -230,7 +247,7 @@ describe("markSubmissionComplete (§4.4)", () => {
 
 describe("issueDeficiency (§4.5)", () => {
   it("sets the status and date, audits the response deadline, and cannot be re-issued while outstanding", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await issueDeficiency(db, supervisor, sub.id, { today: TODAY });
     expect(await db.submission.findUniqueOrThrow({ where: { id: sub.id } })).toMatchObject({
       status: "DEFICIENCY",
@@ -257,7 +274,7 @@ describe("issueDeficiency (§4.5)", () => {
 
 describe("approveAndRegister (§4.6)", () => {
   it("lists every blocking reason", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     const err = await approveAndRegister(
       db,
       approver,
@@ -414,7 +431,7 @@ describe("approveAndRegister (§4.6)", () => {
 
 describe("lapseSubmission (§4.7)", () => {
   it("is blocked on day 14 of the response period and allowed on day 15", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await issueDeficiency(db, supervisor, sub.id, { today: TODAY });
     await expect(
       lapseSubmission(db, supervisor, sub.id, { today: "2026-11-05" }),
@@ -518,11 +535,11 @@ describe("cancelSubmission (§4.9)", () => {
 
 describe("deficiency notices", () => {
   it("record when the response completed the submission, and allow a new notice afterwards", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await assignAll(sub.id);
     const first = await issueDeficiency(db, supervisor, sub.id, { today: TODAY });
     expect(first.noticeRef).toBe("OGSERC/DEF/2026/00001");
-    await completeDocsAndPay(sub.id, sub.ackNo);
+    await completeDocs(sub.id);
     await markSubmissionComplete(db, evaluator, sub.id, { today: "2026-10-30" });
 
     const notices = await db.deficiencyNotice.findMany({ where: { submissionId: sub.id } });
@@ -548,7 +565,7 @@ describe("deficiency notices", () => {
 
 describe("reopenDecision (Admin)", () => {
   it("returns a refused submission to review, with a reason", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await assignAll(sub.id);
     await recordShowCause(db, supervisor, sub.id, { showCauseDate: TODAY }, { today: TODAY });
     await refuseSubmission(
@@ -583,7 +600,7 @@ describe("reopenDecision (Admin)", () => {
   });
 
   it("returns a lapsed submission to its unanswered deficiency notice", async () => {
-    const sub = await newSubmission();
+    const sub = await released();
     await issueDeficiency(db, supervisor, sub.id, { today: TODAY });
     await lapseSubmission(db, supervisor, sub.id, { today: "2026-11-06" });
     expect(

@@ -2,7 +2,7 @@ import { overrideNeedsReason } from "./category";
 import { licenceNeedsRenewal } from "./deadlines";
 import { findActivity } from "./reference";
 import type { Assessment, DomainContext } from "./submission";
-import { LICENCE, STATUS, type SubmissionInput } from "./types";
+import { LICENCE, STATUS, type Status, type SubmissionInput } from "./types";
 import { isValidCac, isValidTin } from "./validation";
 
 export interface DataFlag {
@@ -34,6 +34,18 @@ const REQUIRED_FIELDS: { key: keyof SubmissionInput; label: string }[] = [
  * MGD is excluded because the map puts every mini-grid in Category E. Confirm with the Commission.
  */
 export const GENERATION_CODES = ["GEN", "CPT"];
+
+/**
+ * Statuses only reachable through release for evaluation (§4.12). Refused and Cancelled are not here:
+ * a submission may be refused, or cancelled, while still awaiting payment.
+ */
+const PAST_ACKNOWLEDGEMENT: readonly Status[] = [
+  STATUS.RECEIVED,
+  STATUS.DEFICIENCY,
+  STATUS.PROVISIONAL,
+  STATUS.REGISTERED,
+  STATUS.LAPSED,
+];
 
 const LICENCE_NOT_HELD: readonly string[] = [LICENCE.UNLICENSED, LICENCE.PENDING];
 
@@ -184,6 +196,20 @@ export function dataFlags(
   }
   if (sub.tin?.trim() && !isValidTin(sub.tin, settings.policy.tinPattern)) {
     add("TIN_FORMAT", "TIN format is invalid");
+  }
+
+  // Finance confirmation gate (§4.12).
+  if (
+    sub.dateEvaluationStarted &&
+    (!sub.releasedForEvaluationDate || sub.dateEvaluationStarted < sub.releasedForEvaluationDate)
+  ) {
+    add("EVALUATION_BEFORE_PAYMENT", "Evaluation started before Finance confirmed payment");
+  }
+  if (sub.status && PAST_ACKNOWLEDGEMENT.includes(sub.status) && !sub.releasedForEvaluationDate) {
+    add(
+      "STATUS_WITHOUT_CONFIRMATION",
+      "Status moved past acknowledgement without Finance confirmation",
+    );
   }
 
   // Snapshot pricing: the saved pricing no longer matches the submission's data or current rules.

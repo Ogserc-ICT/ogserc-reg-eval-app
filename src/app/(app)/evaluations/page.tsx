@@ -3,7 +3,7 @@ import { SlaBadge, StatusBadge } from "@/components/badges";
 import { inputClass } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
 import { evaluationProgress } from "@/domain/evaluation";
-import { isClosed } from "@/domain/types";
+import { STATUS, isClosed } from "@/domain/types";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { loadContext } from "@/server/context";
@@ -24,6 +24,8 @@ export default async function EvaluationsPage({ searchParams }: { searchParams: 
   const rows = states.filter((s) => {
     const ev = s.evaluation;
     if (!includeClosed && isClosed(s.sub.status)) return false;
+    // Awaiting payment: not in evaluation until Finance confirms (§4.12); see the dashboard queue.
+    if (s.sub.status === STATUS.AWAITING) return false;
     if (status && s.status !== status) return false;
     if (
       mine &&
@@ -37,6 +39,10 @@ export default async function EvaluationsPage({ searchParams }: { searchParams: 
   return (
     <div>
       <PageHeader title="Evaluations" />
+      <p className="mb-3 text-sm text-gray-600">
+        Submissions still awaiting Finance confirmation of payment are not listed here; see the
+        dashboard queue &ldquo;Awaiting payment&rdquo;.
+      </p>
       <form
         method="get"
         className="mb-4 flex flex-wrap items-end gap-4 rounded border border-gray-200 bg-white p-3"

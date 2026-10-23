@@ -1,6 +1,8 @@
 import { can } from "@/domain/roles";
 import { settingsSchema } from "@/lib/schemas";
 import { writeAudit } from "./audit";
+import { appToday } from "./clock";
+import { releaseEligible } from "./finance";
 import { ForbiddenError, ValidationError } from "./errors";
 import { settingsFromRow, settingsToRow } from "./reference-data";
 import type { Actor, Db } from "./types";
@@ -22,6 +24,8 @@ export async function updateSettings(db: Db, actor: Actor, input: unknown) {
     waiverAppliesToLateCharge,
     flagsBlockApproval,
     tinPattern,
+    lateChargeRequiredForRelease,
+    unpaidReminderDays,
     ...rest
   } = parsed.data;
 
@@ -35,6 +39,8 @@ export async function updateSettings(db: Db, actor: Actor, input: unknown) {
         waiverAppliesToLateCharge,
         flagsBlockApproval,
         tinPattern,
+        lateChargeRequiredForRelease,
+        unpaidReminderDays,
       },
     });
 
@@ -49,6 +55,10 @@ export async function updateSettings(db: Db, actor: Actor, input: unknown) {
       action: "Settings updated",
       detail: changes.join("; "),
     });
+    // §4.12: the gate applies from now on; a lower requirement may release acknowledged submissions.
+    if (before.lateChargeRequiredForRelease !== after.lateChargeRequiredForRelease) {
+      await releaseEligible(tx, actor.id, appToday(), "Finance gate setting changed");
+    }
     return settingsFromRow(row);
   });
 }

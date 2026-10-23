@@ -13,6 +13,7 @@ const db = testDb();
 afterAll(() => db.$disconnect());
 
 let finance: Actor;
+let confirmer: Actor;
 let submissionId: string;
 let ackNo: string;
 let seq = 0;
@@ -20,11 +21,13 @@ let seq = 0;
 beforeEach(async () => {
   await resetDb(db);
   finance = await makeUser(db, ["FINANCE_OFFICER"]);
+  confirmer = await makeUser(db, ["FINANCE_OFFICER"]);
   const sub = await saveSubmission(db, finance.id); // MGD, Category E, ₦250,000
   submissionId = sub.id;
   ackNo = sub.ackNo;
 });
 
+/** A payment already confirmed by Finance (another officer), so it counts (§4.12). */
 function recordPayment(nairaAmount: number) {
   seq++;
   return db.payment.create({
@@ -36,6 +39,9 @@ function recordPayment(nairaAmount: number) {
       submissionId,
       amount: BigInt(naira(nairaAmount)),
       recordedById: finance.id,
+      financeStatus: "CONFIRMED",
+      financeDecidedById: confirmer.id,
+      financeDecidedAt: new Date(),
     },
   });
 }

@@ -9,6 +9,7 @@ import { loadContext } from "./context";
 import { COUNTER, nextCounter } from "./counters";
 import { ForbiddenError } from "./errors";
 import { loadEvaluationStates } from "./evaluation-state";
+import { releaseIfCleared } from "./finance";
 import type { Actor, Db } from "./types";
 
 export const DAILY_REVIEW_ACTION = "Daily review";
@@ -30,9 +31,15 @@ export async function runDailyReview(db: Db, actor: Actor | null, opts: { today?
       await tx.$queryRaw`SELECT set_config('ogserc.workflow', 'on', true)`;
       const ctx = await loadContext(tx, today);
       const states = await loadEvaluationStates(tx, ctx);
-      const result = dailyReview(states, today);
+      const result = dailyReview(states, today, ctx.settings.policy);
       const byId = new Map(states.map((s) => [s.sub.id, s]));
       const userId = actor?.id ?? null;
+
+      // §4.12: acknowledged submissions whose confirmed payments clear the gate but were not released
+      // (e.g. after a settings change or a missed confirmation step).
+      for (const id of result.toRelease) {
+        await releaseIfCleared(tx, userId, id, today, "daily review");
+      }
 
       for (const id of result.toProvisional) {
         const s = byId.get(id)!;
@@ -85,6 +92,8 @@ export async function runDailyReview(db: Db, actor: Actor | null, opts: { today?
       };
       return {
         today,
+        released: result.toRelease.map(name),
+        reminderDue: result.reminderDue.map(name),
         provisional: result.toProvisional.map(name),
         overdueDeficiency: result.overdueDeficiency.map(name),
         locked: locked.map(name),

@@ -13,6 +13,7 @@ import type { Db, Tx } from "./types";
 // DB rows ↔ domain inputs for the Register.
 
 export const STATUS_FROM_DB: Record<Submission["status"], Status> = {
+  AWAITING_PAYMENT: STATUS.AWAITING,
   RECEIVED: STATUS.RECEIVED,
   DEFICIENCY: STATUS.DEFICIENCY,
   PROVISIONAL: STATUS.PROVISIONAL,
@@ -67,13 +68,15 @@ export const submissionInclude = {
   primaryActivity: true,
   secondaryActivity: true,
   documents: true,
+  evaluation: { select: { dateEvaluationStarted: true } },
 } satisfies Prisma.SubmissionInclude;
 
-/** What `submissionFromRow` reads: the row, its activity names and its checklist values. */
+/** What `submissionFromRow` reads: the row, activity names, checklist values and evaluation start. */
 export type SubmissionRowLike = Submission & {
   primaryActivity: { name: string };
   secondaryActivity: { name: string } | null;
   documents: { documentNumber: number; value: DocumentChecklistItem["value"] }[];
+  evaluation: { dateEvaluationStarted: Date | null } | null;
 };
 
 export function submissionFromRow(row: SubmissionRowLike, documentCount: number): SubmissionInput {
@@ -115,6 +118,8 @@ export function submissionFromRow(row: SubmissionRowLike, documentCount: number)
     remarks: row.remarks,
     documents,
     pricing: pricingFromColumns(row),
+    releasedForEvaluationDate: toIsoDate(row.releasedForEvaluationDate),
+    dateEvaluationStarted: toIsoDate(row.evaluation?.dateEvaluationStarted ?? null),
   };
 }
 
@@ -126,6 +131,7 @@ export function paymentFromRow(row: Payment): PaymentInput {
     rrr: row.rrr,
     verifiedWithBank: row.verifiedWithBank ? "Y" : "N",
     status: row.status,
+    financeStatus: row.financeStatus,
   };
 }
 

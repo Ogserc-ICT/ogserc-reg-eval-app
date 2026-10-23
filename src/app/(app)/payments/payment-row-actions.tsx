@@ -4,33 +4,19 @@ import { useActionState, useState } from "react";
 import { FormMessage, SubmitButton, inputClass } from "@/components/form";
 import type { ActionState } from "@/lib/action";
 
-/** Verify / reverse buttons for one payment row. The server checks the role either way. */
+/** Reverse button for one payment row (Finance or Admin, with a reason). The server checks the role. */
 export function PaymentRowActions({
-  verify,
   reverse,
-  canVerify,
-  canReverse,
 }: {
-  verify: () => Promise<ActionState>;
   reverse: (prev: ActionState, fd: FormData) => Promise<ActionState>;
-  canVerify: boolean;
-  canReverse: boolean;
 }) {
-  const [verifyState, verifyAction] = useActionState(verify, {});
   const [reverseState, reverseAction] = useActionState(reverse, {});
   const [reversing, setReversing] = useState(false);
 
   return (
     <div className="space-y-1 text-xs">
       <div className="flex gap-2">
-        {canVerify && (
-          <form action={verifyAction}>
-            <button type="submit" className="text-brand-700 hover:underline">
-              Mark verified
-            </button>
-          </form>
-        )}
-        {canReverse && !reversing && (
+        {!reversing && (
           <button
             type="button"
             className="text-red-700 hover:underline"
@@ -40,7 +26,6 @@ export function PaymentRowActions({
           </button>
         )}
       </div>
-      <FormMessage state={verifyState} />
       {reversing && (
         <form action={reverseAction} className="space-y-1">
           <FormMessage state={reverseState} />

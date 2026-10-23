@@ -181,7 +181,8 @@ export function evaluationStatus(ev: EvaluationInput, counts: CheckCounts): Eval
   return counts.pending > 0 ? "In progress" : "Ready for decision";
 }
 
-export type RecommendedOutcome = FinalDecision | "Evaluation in progress";
+export type RecommendedOutcome =
+  FinalDecision | "Evaluation in progress" | "Awaiting Finance confirmation";
 
 /** §4.11 */
 export function recommendedOutcome(
@@ -194,6 +195,9 @@ export function recommendedOutcome(
 ): RecommendedOutcome {
   const value = (id: string) => checks.find((c) => c.id === id)?.value ?? null;
   if (value("1.3") === "N" || value("1.4") === "N") return FINAL_DECISION.REDIRECT;
+  // §4.12: nothing is determined until Finance has confirmed payment.
+  if (sub.status === STATUS.AWAITING && !a.financeGate.cleared)
+    return "Awaiting Finance confirmation";
   if (
     sub.status === STATUS.DEFICIENCY &&
     a.deficiencyResponseDue &&

@@ -5,7 +5,7 @@ describe("roles and permissions (§5)", () => {
   it("gives each role its duties and every role read access", () => {
     expect(can(["REGISTRY_OFFICER"], "submission.create")).toBe(true);
     expect(can(["REGISTRY_OFFICER"], "submission.approve")).toBe(false);
-    expect(can(["FINANCE_OFFICER"], "payment.verify")).toBe(true);
+    expect(can(["FINANCE_OFFICER"], "payment.confirm")).toBe(true);
     expect(can(["REVIEWING_SUPERVISOR"], "submission.lapse")).toBe(true);
     expect(can(["APPROVING_OFFICER"], "submission.refuse")).toBe(true);
     expect(can(["ADMIN"], "submission.cancel")).toBe(true);
@@ -16,7 +16,7 @@ describe("roles and permissions (§5)", () => {
 
   it("unions several roles", () => {
     const roles = ["REGISTRY_OFFICER", "FINANCE_OFFICER"] as const;
-    expect(can(roles, "ownUse.create") && can(roles, "payment.verify")).toBe(true);
+    expect(can(roles, "ownUse.create") && can(roles, "payment.confirm")).toBe(true);
   });
 
   it("lets only the assigned evaluator or a supervisor edit checks", () => {

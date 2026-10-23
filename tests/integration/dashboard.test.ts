@@ -8,7 +8,8 @@ import { loadEvaluationState, loadEvaluationStates } from "@/server/evaluation-s
 import { createSubmission } from "@/server/intake";
 import { createOwnUse } from "@/server/own-use";
 import { listRegister } from "@/server/register";
-import { recordPayment, reversePayment, verifyPayment } from "@/server/payments";
+import { confirmPayment } from "@/server/finance";
+import { recordPayment, reversePayment } from "@/server/payments";
 import type { Actor } from "@/server/types";
 import { assignOfficers, issueDeficiency } from "@/server/workflow";
 import { generateFakeData } from "../../scripts/seed-fake";
@@ -61,12 +62,7 @@ describe("getDashboard", () => {
   it("counts the Register, own-use and payments, and builds each user's queues", async () => {
     const a = await createSubmission(db, registry, form("Alpha Grid Ltd", "RC1", "Ifo"));
     const b = await createSubmission(db, registry, form("Beta Grid Ltd", "RC2", "Odeda"));
-    await assignOfficers(db, supervisor, a.id, {
-      evaluatingOfficerId: evaluator.id,
-      reviewingSupervisorId: supervisor.id,
-      approvingOfficerId: approver.id,
-    });
-    await issueDeficiency(db, supervisor, b.id, { today: TODAY });
+    const c = await createSubmission(db, registry, form("Gamma Power Ltd", "RC3", "Ewekoro"));
     const oun = await createOwnUse(db, registry, {
       name: "Ifo Bottling",
       dateFiled: TODAY,
@@ -93,26 +89,44 @@ describe("getDashboard", () => {
         amount,
         rrr: "",
       });
-    const p1 = await pay(a.ackNo, "250000");
-    await verifyPayment(db, finance, p1.id);
-    const p2 = await pay(b.ackNo, "100000");
-    await reversePayment(db, finance, p2.id, { reason: "Posted to the wrong file" });
-    await pay(oun.ounNo, "100000");
+    // Recorded by Finance; confirmed by another Finance officer, which releases A and B (§4.12).
+    const confirmer = await makeUser(db, ["FINANCE_OFFICER"]);
+    const confirm = (id: string) =>
+      confirmPayment(db, confirmer, id, { verified: true, remarks: "" }, { today: TODAY });
+    await confirm((await pay(a.ackNo, "250000")).id);
+    await confirm((await pay(b.ackNo, "250000")).id);
+    await confirm((await pay(oun.ounNo, "100000")).id);
+    const wrong = await pay(b.ackNo, "100000");
+    await reversePayment(db, finance, wrong.id, { reason: "Posted to the wrong file" });
+    await pay(c.ackNo, "50000"); // still with Finance: C stays acknowledged
+
+    await assignOfficers(db, supervisor, a.id, {
+      evaluatingOfficerId: evaluator.id,
+      reviewingSupervisorId: supervisor.id,
+      approvingOfficerId: approver.id,
+    });
+    await issueDeficiency(db, supervisor, b.id, { today: TODAY });
 
     const { dashboard: d, queues } = await getDashboard(db, evaluator, { today: "2026-11-10" });
-    expect(d.submissions).toMatchObject({ total: 2, inProgress: 2, ownUse: 1 });
+    expect(d.submissions).toMatchObject({
+      total: 3,
+      awaitingPayment: 1,
+      inProgress: 2,
+      ownUse: 1,
+    });
     expect(d.money).toMatchObject({
-      totalDue: 60_000_000, // ₦250k × 2 + ₦100k own-use
-      collected: 35_000_000, // the reversed ₦100k does not count
-      verified: 25_000_000,
-      outstanding: 25_000_000,
+      totalDue: 85_000_000, // ₦250k × 3 + ₦100k own-use
+      collected: 60_000_000, // confirmed only: the reversed ₦100k and the pending ₦50k do not count
+      withFinance: 5_000_000,
+      withFinanceCount: 1,
+      outstanding: 25_000_000, // C
     });
     expect(d.byLga.find((l) => l.lga === "Ifo")).toEqual({ lga: "Ifo", registrants: 1, ownUse: 1 });
     expect(d.byCategory.find((r) => r.category === "I")).toMatchObject({
       submissions: 1,
       collected: 10_000_000,
     });
-    expect(d.monthly[0]).toMatchObject({ submissions: 2, collected: 35_000_000 });
+    expect(d.monthly[0]).toMatchObject({ submissions: 3, collected: 60_000_000 });
 
     expect(queues.mine.map((q) => [q.name, q.roles])).toEqual([
       ["Alpha Grid Ltd", ["Evaluating officer"]],
@@ -120,6 +134,9 @@ describe("getDashboard", () => {
     // B's 14-day response period ended on 5 November.
     expect(queues.overdueDeficiency.map((q) => [q.name, q.daysOverdue])).toEqual([
       ["Beta Grid Ltd", 5],
+    ]);
+    expect(queues.awaitingPayment.map((q) => [q.name, q.daysWaiting, q.stage])).toEqual([
+      ["Gamma Power Ltd", 19, "Payment with Finance"],
     ]);
     expect(
       (await getDashboard(db, approver, { today: "2026-11-10" })).queues.mine.map((q) => q.roles),

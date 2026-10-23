@@ -5,13 +5,13 @@ import { nairaToKobo as naira } from "@/domain/money";
 import { ConfirmationRequiredError, ForbiddenError, ValidationError } from "@/server/errors";
 import { createSubmission, setWaiver, updateDocuments, updateSubmission } from "@/server/intake";
 import { createOwnUse, listOwnUse, recalculateOwnUsePricing, updateOwnUse } from "@/server/own-use";
-import { recordPayment, verifyPayment } from "@/server/payments";
+import { recordPayment } from "@/server/payments";
 import { recalculatePricingBulk } from "@/server/pricing";
 import { getSubmissionDetail, listRegister } from "@/server/register";
 import { hashSessionToken } from "@/server/session-store";
 import type { Actor } from "@/server/types";
 import { changeOwnPassword } from "@/server/users";
-import { asWorkflow, makeUser, resetDb, testDb } from "./helpers";
+import { asWorkflow, confirmPayments, makeUser, resetDb, testDb } from "./helpers";
 
 const db = testDb();
 afterAll(() => db.$disconnect());
@@ -65,7 +65,7 @@ describe("createSubmission (§4.1)", () => {
     const sub = await createSubmission(db, registry, intake());
     expect(sub).toMatchObject({
       ackNo: "OGSERC/ACK/2026/00001",
-      status: "RECEIVED",
+      status: "AWAITING_PAYMENT",
       cacNo: "RC123456",
       customers: 1200,
       pricedCategory: "E",
@@ -89,11 +89,24 @@ describe("createSubmission (§4.1)", () => {
     expect(second.ackNo).toBe("OGSERC/ACK/2026/00002");
   });
 
-  it("starts the evaluation clock when an evaluating officer is chosen", async () => {
+  it("records an evaluating officer chosen at intake; the evaluation starts on release (§4.12)", async () => {
     const sub = await createSubmission(db, registry, intake({ evaluatingOfficerId: evaluator.id }));
     const ev = await db.evaluation.findUniqueOrThrow({ where: { submissionId: sub.id } });
     expect(ev.evaluatingOfficerId).toBe(evaluator.id);
-    expect(ev.dateEvaluationStarted).not.toBeNull();
+    expect(ev.dateEvaluationStarted).toBeNull();
+    await recordPayment(db, registry, {
+      dateReceived: "2026-10-22",
+      reference: sub.ackNo,
+      purpose: "",
+      channel: "",
+      amount: "250000",
+      rrr: "",
+    });
+    await confirmPayments(db, sub.ackNo);
+    expect(
+      (await db.evaluation.findUniqueOrThrow({ where: { submissionId: sub.id } }))
+        .dateEvaluationStarted,
+    ).not.toBeNull();
     await expect(
       createSubmission(db, registry, intake({ cacNo: "", evaluatingOfficerId: finance.id })),
     ).rejects.toMatchObject({
@@ -223,7 +236,7 @@ describe("updateSubmission", () => {
       registrationNo: "OGSERC/REG/2026/E-MGD/0001",
     });
     expect(await db.submission.findUniqueOrThrow({ where: { id: sub.id } })).toMatchObject({
-      status: "RECEIVED",
+      status: "AWAITING_PAYMENT",
       registrationNo: null,
     });
   });
@@ -283,7 +296,7 @@ describe("payments (§4.2)", () => {
     ...o,
   });
 
-  it("records against an Ack No., numbers it and audits; the submission shows Paid", async () => {
+  it("records against an Ack No., numbers it and audits; Paid once Finance confirms it", async () => {
     const sub = await createSubmission(db, registry, intake());
     const p = await recordPayment(db, registry, pay({ reference: "ogserc/ack/2026/00001" }));
     expect(p).toMatchObject({
@@ -296,6 +309,9 @@ describe("payments (§4.2)", () => {
       reference: sub.ackNo,
       detail: "₦250,000 - ref RRR-1 - OGSERC/PAY/2026/00001",
     });
+    expect(p.financeStatus).toBe("PENDING");
+    expect((await getSubmissionDetail(db, sub.id))!.assessment.fees.paymentStatus).toBe("Unpaid");
+    await confirmPayments(db, sub.ackNo);
     expect((await getSubmissionDetail(db, sub.id))!.assessment.fees.paymentStatus).toBe("Paid");
   });
 
@@ -312,15 +328,6 @@ describe("payments (§4.2)", () => {
     );
     await recordPayment(db, registry, pay({ rrr: "rrr-1" }), { confirmDuplicateRrr: true });
     expect(await db.payment.count()).toBe(2);
-  });
-
-  it("only Finance verifies with the bank; reversed payments cannot be verified", async () => {
-    await createSubmission(db, registry, intake());
-    const p = await recordPayment(db, finance, pay());
-    await expect(verifyPayment(db, registry, p.id)).rejects.toBeInstanceOf(ForbiddenError);
-    const verified = await verifyPayment(db, finance, p.id);
-    expect(verified).toMatchObject({ verifiedWithBank: true, verifiedById: finance.id });
-    expect((await lastAudit()).action).toBe("Payment verified with bank");
   });
 });
 
@@ -366,6 +373,9 @@ describe("own-use notifications (§4.3)", () => {
       amount: "100000",
       rrr: "",
     });
+    // Pending with Finance: not yet paid (§4.12).
+    expect((await listOwnUse(db))[0]!.assessment.paymentStatus).toBe("Unpaid");
+    await confirmPayments(db, row.ounNo);
     const [paid] = await listOwnUse(db);
     expect(paid!.assessment.paymentStatus).toBe("Paid");
   });
@@ -470,6 +480,7 @@ describe("Register list", () => {
       amount: "250000",
       rrr: "",
     });
+    await confirmPayments(db, "OGSERC/ACK/2026/00001");
     const names = async (f: Parameters<typeof listRegister>[1]) =>
       (await listRegister(db, f, "2026-10-25")).map((r) => r.registeredName);
 

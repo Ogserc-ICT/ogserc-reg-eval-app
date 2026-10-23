@@ -19,13 +19,33 @@ export function lateCharge(category: string | null, daysLate: number, ref: Refer
   return lateChargeFor(feeTermsFor(category, ref), daysLate);
 }
 
-/** Active payments matched on a reference. Reversed payments stay on record but never count. */
+/** A payment that counts: not reversed, and confirmed by Finance (the Finance gate). */
+export const countsAsPaid = (p: PaymentInput) =>
+  p.status !== "REVERSED" && p.financeStatus === "CONFIRMED";
+
+/** A payment still with Finance: not reversed, neither confirmed nor rejected. */
+export const isWithFinance = (p: PaymentInput) =>
+  p.status !== "REVERSED" && p.financeStatus === "PENDING";
+
+/**
+ * Payments that count, matched on a reference. Reversed, pending and rejected payments stay on
+ * record but never count towards amount paid, balance, completeness or collections.
+ */
 export function paymentsFor(
   reference: string | null,
   payments: readonly PaymentInput[],
 ): PaymentInput[] {
   if (!reference) return [];
-  return payments.filter((p) => p.reference === reference && p.status !== "REVERSED");
+  return payments.filter((p) => p.reference === reference && countsAsPaid(p));
+}
+
+/** Payments recorded against a reference that are still waiting for Finance. */
+export function pendingPaymentsFor(
+  reference: string | null,
+  payments: readonly PaymentInput[],
+): PaymentInput[] {
+  if (!reference) return [];
+  return payments.filter((p) => p.reference === reference && isWithFinance(p));
 }
 
 export interface FeeSummary {

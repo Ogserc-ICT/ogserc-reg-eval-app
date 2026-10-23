@@ -24,6 +24,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "./errors";
+import { releaseIfCleared } from "./finance";
 import { priceNewSubmission } from "./pricing";
 import { fromIsoDate, koboToNumber, loadList, toIsoDate } from "./reference-data";
 import { STATUS_FROM_DB, pricingFromColumns } from "./submissions";
@@ -184,7 +185,8 @@ export async function createSubmission(
       data: {
         submissionId: submission.id,
         evaluatingOfficerId: v.evaluatingOfficerId,
-        dateEvaluationStarted: v.evaluatingOfficerId ? fromIsoDate(ctx.today) : null,
+        // Evaluation starts once Finance has confirmed payment (§4.12), not at intake.
+        dateEvaluationStarted: null,
       },
     });
 
@@ -435,6 +437,8 @@ export async function setWaiver(db: Db, actor: Actor, id: string, input: unknown
       reference: current.ackNo,
       detail: `${formatNaira(old)} → ${formatNaira(amount)}. Reason: ${reason}`,
     });
+    // §4.12: a waiver lowers what release requires; confirmed payments may now clear the gate.
+    await releaseIfCleared(tx, actor.id, id, ctx.today, "waiver set");
     return updated;
   });
 }

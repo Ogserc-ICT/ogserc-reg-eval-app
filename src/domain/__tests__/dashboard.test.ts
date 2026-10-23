@@ -129,6 +129,9 @@ describe("buildDashboard (SPEC §10)", () => {
     { ...payment("C", 200_000, addDays(ED, 30)), verifiedWithBank: "N" },
     { ...payment("C", 999_999, addDays(ED, 31)), status: "REVERSED" },
     { ...payment("OGSERC/OUN/2026/0001", 100_000, ED), verifiedWithBank: "Y" },
+    // §4.12: recorded but not confirmed by Finance, and rejected: neither counts as collected.
+    payment("B", 300_000, addDays(ED, 25), "PENDING"),
+    payment("A", 99_000, addDays(ED, 26), "REJECTED"),
   ];
   const subs = [
     row(a, pays, "Ready for decision"),
@@ -162,6 +165,7 @@ describe("buildDashboard (SPEC §10)", () => {
   it("counts submissions by state", () => {
     expect(dash.submissions).toEqual({
       total: 4,
+      awaitingPayment: 0,
       registered: 1,
       provisional: 0,
       inProgress: 2,
@@ -179,11 +183,13 @@ describe("buildDashboard (SPEC §10)", () => {
 
   it("sums money on live records; refused, lapsed and cancelled balances are shown apart", () => {
     // Due (live): A 250k + B 1.8m + C 200k + OUN 100k = 2.35m. D (Refused, 250k unpaid) is apart.
-    // Collected counts every active payment: 250k + 200k + 100k.
+    // Collected counts every Finance-confirmed, unreversed payment: 250k + 200k + 100k. The pending
+    // ₦300k on B is "with Finance"; the rejected ₦99k on A counts nowhere.
     expect(dash.money).toEqual({
       totalDue: naira(2_350_000),
       collected: naira(550_000),
-      verified: naira(350_000),
+      withFinance: naira(300_000),
+      withFinanceCount: 1,
       outstanding: naira(1_800_000),
       collectionRate: (2_350_000 - 1_800_000) / 2_350_000,
       unpaidOnClosed: naira(250_000),
@@ -307,5 +313,41 @@ describe("workQueues (§10)", () => {
     const { overdueDeficiency, readyForDecision } = workQueues(rows, "u1", TODAY);
     expect(overdueDeficiency.map((m) => [m.ackNo, m.daysOverdue])).toEqual([["O", 26]]);
     expect(readyForDecision.map((m) => m.ackNo)).toEqual(["R"]);
+  });
+
+  it("lists submissions awaiting payment, oldest first, with days since acknowledgement (§4.12)", () => {
+    const awaiting = (id: string, submitted: string, pays: PaymentInput[] = []) => ({
+      ...row(
+        makeSubmission({
+          id,
+          ackNo: id.toUpperCase(),
+          status: STATUS.AWAITING,
+          dateSubmitted: submitted,
+          releasedForEvaluationDate: null,
+        }),
+        pays,
+        "Not assigned",
+      ),
+      officers,
+      finalDecision: null,
+    });
+    const withAwaiting = [
+      ...rows,
+      awaiting("new", addDays(TODAY, -3)),
+      awaiting("old", addDays(TODAY, -40), [payment("OLD", 250_000, ED, "PENDING")]),
+    ];
+    const queues = workQueues(withAwaiting, "u3", TODAY, 30);
+    expect(
+      queues.awaitingPayment.map((m) => [m.ackNo, m.daysWaiting, m.reminderDue, m.stage]),
+    ).toEqual([
+      ["OLD", 40, true, "Payment with Finance"],
+      ["NEW", 3, false, "Acknowledged – awaiting payment"],
+    ]);
+    // Not in the evaluation queues until released.
+    expect(queues.mine.map((m) => m.ackNo)).toEqual(["R", "O"]);
+    // No reminder setting: no reminder marks.
+    expect(workQueues(withAwaiting, "u3", TODAY).awaitingPayment.some((m) => m.reminderDue)).toBe(
+      false,
+    );
   });
 });

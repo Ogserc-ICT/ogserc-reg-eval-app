@@ -4,12 +4,7 @@ import { revalidatePath } from "next/cache";
 import { formBool, formText, formValues, runAction, type ActionState } from "@/lib/action";
 import { db } from "@/lib/db";
 import { safeInternalPath } from "@/lib/paths";
-import {
-  CONFIRM_DUPLICATE_RRR,
-  recordPayment,
-  reversePayment,
-  verifyPayment,
-} from "@/server/payments";
+import { CONFIRM_DUPLICATE_RRR, recordPayment, reversePayment } from "@/server/payments";
 
 const PAYMENT_FIELDS = [
   "dateReceived",
@@ -32,14 +27,6 @@ export async function recordPaymentAction(_prev: ActionState, fd: FormData): Pro
     const back = safeInternalPath(formText(fd, "returnTo"), "/payments");
     return { redirectTo: `${back}${back.includes("?") ? "&" : "?"}notice=payment` };
   }, values);
-}
-
-export async function verifyPaymentAction(id: string): Promise<ActionState> {
-  return runAction(async (actor) => {
-    await verifyPayment(db, actor, id);
-    revalidatePath("/", "layout");
-    return "Marked as verified with the bank.";
-  });
 }
 
 export async function reversePaymentAction(

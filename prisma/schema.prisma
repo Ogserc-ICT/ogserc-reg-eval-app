@@ -54,6 +54,7 @@ model User {
   evaluationsAsApprover   Evaluation[]         @relation("ApprovingOfficer")
   paymentsRecorded        Payment[]            @relation("PaymentRecordedBy")
   paymentsVerified        Payment[]            @relation("PaymentVerifiedBy")
+  paymentsFinanceDecided  Payment[]            @relation("PaymentFinanceDecidedBy")
   paymentsReversed        Payment[]            @relation("PaymentReversedBy")
   ownUseCreated           OwnUseNotification[]
   workbooksUploaded       WorkbookImport[]     @relation("WorkbookUploadedBy")
@@ -133,6 +134,12 @@ model Settings {
   waiverAppliesToLateCharge    Boolean   @default(false)
   flagsBlockApproval           Boolean   @default(false)
   tinPattern                   String?
+  /// Finance gate: when on, confirmed payments must cover the total due (incl. late charge), not
+  /// just fee − waiver, before a submission is released for evaluation.
+  lateChargeRequiredForRelease Boolean   @default(false)
+  /// Days after acknowledgement before an unpaid submission is marked "reminder due" on the
+  /// dashboard queue. Null = no reminder.
+  unpaidReminderDays           Int?
   updatedAt                    DateTime  @updatedAt
 }
 
@@ -212,13 +219,15 @@ model Counter {
 // ---------------------------------------------------------------------------
 
 enum SubmissionStatus {
-  RECEIVED    @map("Received - Under Review")
-  DEFICIENCY  @map("Deficiency Notice Issued")
-  PROVISIONAL @map("Provisionally Registered")
-  REGISTERED  @map("Registered")
-  LAPSED      @map("Lapsed")
-  REFUSED     @map("Refused")
-  CANCELLED   @map("Cancelled")
+  /// First status (Finance confirmation gate): acknowledged, waiting for Finance to confirm payment.
+  AWAITING_PAYMENT @map("Acknowledged - Awaiting Payment")
+  RECEIVED         @map("Received - Under Review")
+  DEFICIENCY       @map("Deficiency Notice Issued")
+  PROVISIONAL      @map("Provisionally Registered")
+  REGISTERED       @map("Registered")
+  LAPSED           @map("Lapsed")
+  REFUSED          @map("Refused")
+  CANCELLED        @map("Cancelled")
 }
 
 enum CheckValue {
@@ -263,16 +272,18 @@ model Submission {
   categoryOverride String?
   overrideReason   String?
 
-  status                  SubmissionStatus @default(RECEIVED)
-  dateSubmissionComplete  DateTime?        @db.Date
-  deficiencyNoticeDate    DateTime?        @db.Date
-  showCauseDate           DateTime?        @db.Date
-  certificateIssueDate    DateTime?        @db.Date
+  status                    SubmissionStatus @default(AWAITING_PAYMENT)
+  /// Set when confirmed payments first cleared the Finance gate (status → Received - Under Review).
+  releasedForEvaluationDate DateTime?        @db.Date
+  dateSubmissionComplete    DateTime?        @db.Date
+  deficiencyNoticeDate      DateTime?        @db.Date
+  showCauseDate             DateTime?        @db.Date
+  certificateIssueDate      DateTime?        @db.Date
   /// Locked once issued; never changes afterwards.
-  registrationNo          String?          @unique
-  remarks                 String?
+  registrationNo            String?          @unique
+  remarks                   String?
   /// Set when Admin changes a field printed on the certificate of a Registered record (Phase 5 reissues).
-  certificateNeedsReissue Boolean          @default(false)
+  certificateNeedsReissue   Boolean          @default(false)
 
   // Pricing snapshot, taken when the submission is saved. Later edits to the fee table or Settings
   // never change it; only an admin recalculation does (trigger-enforced; src/server/pricing.ts).
@@ -419,6 +430,13 @@ model EvaluationCheckValue {
 // Payments and own-use notifications
 // ---------------------------------------------------------------------------
 
+/// Finance confirmation of a payment. Only CONFIRMED payments count towards amounts paid.
+enum PaymentFinanceStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
 enum PaymentRecordStatus {
   ACTIVE
   /// Recorded in error; kept for the audit trail and excluded from totals.
@@ -427,10 +445,10 @@ enum PaymentRecordStatus {
 
 /// SPEC §1.4. Linked to exactly one Submission or OwnUseNotification via `reference`.
 model Payment {
-  id                   String              @id @default(cuid())
-  paymentSeq           Int                 @unique
-  paymentNo            String              @unique
-  dateReceived         DateTime            @db.Date
+  id                   String               @id @default(cuid())
+  paymentSeq           Int                  @unique
+  paymentNo            String               @unique
+  dateReceived         DateTime             @db.Date
   reference            String
   submissionId         String?
   ownUseNotificationId String?
@@ -438,24 +456,31 @@ model Payment {
   channel              String?
   amount               BigInt
   rrr                  String?
-  verifiedWithBank     Boolean             @default(false)
+  verifiedWithBank     Boolean              @default(false)
   verifiedById         String?
   verifiedAt           DateTime?
-  status               PaymentRecordStatus @default(ACTIVE)
+  /// Finance decision: PENDING until a Finance officer (not the recorder) confirms or rejects it.
+  financeStatus        PaymentFinanceStatus @default(PENDING)
+  financeDecidedById   String?
+  financeDecidedAt     DateTime?
+  financeRemarks       String?
+  status               PaymentRecordStatus  @default(ACTIVE)
   reversalReason       String?
   reversedById         String?
   reversedAt           DateTime?
   recordedById         String
-  createdAt            DateTime            @default(now())
+  createdAt            DateTime             @default(now())
 
   submission         Submission?         @relation(fields: [submissionId], references: [id])
   ownUseNotification OwnUseNotification? @relation(fields: [ownUseNotificationId], references: [id])
   recordedBy         User                @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
   verifiedBy         User?               @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
+  financeDecidedBy   User?               @relation("PaymentFinanceDecidedBy", fields: [financeDecidedById], references: [id])
   reversedBy         User?               @relation("PaymentReversedBy", fields: [reversedById], references: [id])
 
   @@index([reference])
   @@index([rrr])
+  @@index([financeStatus])
 }
 
 /// SPEC §1.5: Category I, para 3(4), form OUN-01.

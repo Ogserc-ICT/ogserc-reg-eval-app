@@ -2,6 +2,47 @@
 
 Decisions made during the build that refine `docs/SPEC.md`. Newest first. If this file and the spec disagree, this file wins; raise anything unclear.
 
+## 2026-10-24 — Finance confirmation gate (Commission's updated workbook; SPEC §4.12)
+
+The rules are in SPEC §4.12. Choices made here, where the instruction left room:
+
+- **Who confirms:** the Finance role only (permission `payment.confirm`). Admin can confirm only if it also holds the Finance role. The officer who recorded a payment cannot confirm it; the database refuses it too. That officer *may* reject it, because only confirmation was restricted.
+- **The old "Mark verified" action is gone.** Confirming on the Finance Desk requires the "verified against bank/Remita" tick and records the verification (who and when), so the two would have meant the same thing. The permission `payment.verify` is replaced by `payment.confirm`.
+- **Decisions are final.** Pending changes to Confirmed or Rejected once (DB trigger).
+  - A confirmed payment is undone only by reversal (Finance or Admin, with a reason). A released submission stays released, but the gate closes again, so evaluation actions are blocked until payments are confirmed again.
+  - A rejected payment cannot be reversed, because it never counted.
+- **What the gate blocks:**
+  - The evaluation page shows the reason instead of the checks, for open submissions only. Closed records stay viewable, read-only.
+  - Blocked actions: saving checks, recording the review, mark complete, the deficiency notice (issue and draft), approval, the evaluation form, and certificate issue or reissue.
+  - Not blocked: refusal, show-cause, cancel and officer assignment.
+  - Each blocked attempt writes `Blocked - awaiting Finance confirmation` with the action and the amounts, including each blocked visit to the evaluation page.
+- **What can trigger a release** (same transaction, audited `Released for evaluation`):
+  - a confirmation;
+  - a waiver;
+  - a change to the late-charge setting (the change itself is audited as a setting);
+  - the daily review, for any missed;
+  - any gated action attempted after the gate has cleared.
+- **Evaluation start:** an officer chosen at intake no longer starts the evaluation date. The date is set on release, or on assignment after release.
+- **Flags:** "Status moved past acknowledgement without Finance confirmation" covers Received, Deficiency, Provisionally Registered, Registered and Lapsed with no release date. It does not cover Refused or Cancelled, which can legitimately happen before release.
+- **Reopen decision:** a Refused or Cancelled record that was never released returns to "Acknowledged - Awaiting Payment".
+- **Days:** the dashboard counts "days since acknowledgement" from the date submitted (the date on the acknowledgement letter). The Finance Desk counts "days waiting" from when the payment was recorded.
+- **Unpaid acknowledgement reminder:** when set, it marks queue items "reminder due" and adds a count to the daily review summary. It sends nothing, because there is no messaging in the system.
+- **Dashboard:**
+  - "Collected" counts Finance-confirmed payments only.
+  - The "Collected and bank-verified" tile became **"With Finance"**: money recorded but awaiting confirmation.
+  - New "Awaiting payment" count, and an "Awaiting payment, oldest first" queue.
+  - Awaiting submissions are left out of the evaluation tallies, the evaluator queues and the Evaluations list.
+- **Register:** the process stage is shown under each status, and the export gains "Process Stage" and "Released for Evaluation" columns.
+- **Workbook import:**
+  - Imported payments are Pending.
+  - Imported records that are not closed come in as "Acknowledged - Awaiting Payment" (with a preview warning) and keep their dates.
+  - Imported Registered or Lapsed records keep their status and show the "without Finance confirmation" flag (also warned in the preview).
+- **Existing records** (migration `20261024090200_finance_gate_existing_records`, after `…090000` and `…090100` for the schema):
+  - Every submission not closed and with no Confirmed payment returns to "Acknowledged - Awaiting Payment", **including Deficiency Notice Issued and Provisionally Registered**, as instructed. Their dates are kept, so their evaluation-start flag will show.
+  - Each gets one audit entry, plus one summary entry. Payments recorded before the gate are Pending (column default).
+  - `npm run finance-gate:dry-run` shows the effect first and changes nothing. Dry runs on 24 Oct 2026: **dev database: 2 submissions, both closed, 0 would move, 2 payments become Pending; live database: 0 submissions, 0 would move.**
+- **Not yet applied** to the dev or live database, pending the owner's go-ahead after the dry run. On Vercel, the next production deploy applies all three migrations automatically.
+
 ## 2026-10-23 — Hosting: Vercel + Neon (chosen over the VPS)
 
 The owner does not want to look after a server. **Production runs on Vercel, with the database on Neon.** The Docker/VPS setup below stays in the repository as the alternative. Guide: docs/DEPLOYMENT-VERCEL.md.

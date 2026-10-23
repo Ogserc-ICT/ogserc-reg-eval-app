@@ -59,6 +59,8 @@ export function settingsFromRow(row: SettingsRow): Settings {
       waiverAppliesToLateCharge: row.waiverAppliesToLateCharge,
       flagsBlockApproval: row.flagsBlockApproval,
       tinPattern: row.tinPattern,
+      lateChargeRequiredForRelease: row.lateChargeRequiredForRelease,
+      unpaidReminderDays: row.unpaidReminderDays,
     },
   };
 }
@@ -87,6 +89,8 @@ export function settingsToRow(s: Settings): Omit<SettingsRow, "id" | "updatedAt"
     waiverAppliesToLateCharge: s.policy.waiverAppliesToLateCharge,
     flagsBlockApproval: s.policy.flagsBlockApproval,
     tinPattern: s.policy.tinPattern,
+    lateChargeRequiredForRelease: s.policy.lateChargeRequiredForRelease,
+    unpaidReminderDays: s.policy.unpaidReminderDays,
   };
 }
 

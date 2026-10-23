@@ -22,7 +22,9 @@ import { db } from "@/lib/db";
 import { showDate, showText } from "@/lib/format";
 import { requirePermission } from "@/lib/session";
 import { loadContext } from "@/server/context";
+import { BlockedError } from "@/server/errors";
 import { loadEvaluationState } from "@/server/evaluation-state";
+import { requireFinanceGate } from "@/server/finance";
 import { toIsoDate } from "@/server/reference-data";
 import {
   approveAction,
@@ -53,8 +55,22 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
   const user = await requirePermission("records.read");
   const { id } = await params;
   const ctx = await loadContext(db);
-  const state = await loadEvaluationState(db, id, ctx);
-  if (!state) notFound();
+  const first = await loadEvaluationState(db, id, ctx);
+  if (!first) notFound();
+
+  // §4.12: an open submission is evaluated only once Finance has confirmed payment. A blocked visit
+  // is audited; refusal, show-cause, cancel and officer assignment stay available.
+  let gateBlocked: string[] | null = null;
+  let state = first;
+  if (!isClosed(first.sub.status)) {
+    try {
+      await requireFinanceGate(db, user, id, "Evaluation opened", ctx.today);
+      if (first.sub.status === STATUS.AWAITING) state = (await loadEvaluationState(db, id, ctx))!;
+    } catch (e) {
+      if (!(e instanceof BlockedError)) throw e;
+      gateBlocked = e.reasons;
+    }
+  }
   const { row, sub, assessment: a, evaluation: ev, counts, flags } = state;
   const { today, settings } = ctx;
   const closed = isClosed(sub.status);
@@ -167,12 +183,41 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
               <FlagList flags={flags} />
             </Panel>
           )}
-          <ChecksForm
-            action={saveChecksAction.bind(null, id)}
-            checks={checkRows}
-            remarks={ev.evaluationRemarks ?? ""}
-            canEdit={mayEditChecks}
-          />
+          {gateBlocked ? (
+            <section
+              role="alert"
+              aria-label="Awaiting Finance confirmation"
+              className="rounded border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-900"
+            >
+              <p className="font-semibold">
+                Evaluation is not available until Finance confirms payment.
+              </p>
+              <ul className="mt-1 ml-5 list-disc">
+                {gateBlocked.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+              <p className="mt-2">
+                Stage: {a.processStage.stage}. {a.processStage.label}.{" "}
+                {can(roles, "payment.confirm") ? (
+                  <Link href="/finance" className="text-brand-700 hover:underline">
+                    Open the Finance Desk
+                  </Link>
+                ) : (
+                  <Link href={`/submissions/${id}`} className="text-brand-700 hover:underline">
+                    See the payments on the submission
+                  </Link>
+                )}
+              </p>
+            </section>
+          ) : (
+            <ChecksForm
+              action={saveChecksAction.bind(null, id)}
+              checks={checkRows}
+              remarks={ev.evaluationRemarks ?? ""}
+              canEdit={mayEditChecks}
+            />
+          )}
         </div>
 
         <div className="space-y-4">
@@ -217,7 +262,7 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
           </Panel>
 
           <Panel title="Actions">
-            {can(roles, "submission.markComplete") && (
+            {can(roles, "submission.markComplete") && !gateBlocked && (
               <WorkflowAction
                 title="Mark submission complete"
                 description="All documents received or N/A and the fee paid (para 13(1)). Starts the 30-day determination clock."
@@ -226,7 +271,7 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
                 submitLabel="Mark complete"
               />
             )}
-            {can(roles, "evaluation.review") && (
+            {can(roles, "evaluation.review") && !gateBlocked && (
               <WorkflowAction
                 title="Record review"
                 description="The reviewing supervisor confirms the evaluation has been reviewed."
@@ -235,7 +280,7 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
                 submitLabel="Record review"
               />
             )}
-            {can(roles, "deficiency.issue") && (
+            {can(roles, "deficiency.issue") && !gateBlocked && (
               <WorkflowAction
                 title="Issue deficiency notice"
                 description={`Para 13(1)(b): the applicant has ${settings.deficiencyDays} days to respond.`}
@@ -244,7 +289,7 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
                 submitLabel="Issue deficiency notice"
               />
             )}
-            {can(roles, "submission.approve") && (
+            {can(roles, "submission.approve") && !gateBlocked && (
               <WorkflowAction
                 title="Approve and register"
                 description="Para 13(1)(a). Generates and locks the registration number."

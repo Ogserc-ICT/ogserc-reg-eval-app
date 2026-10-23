@@ -96,6 +96,7 @@ export function RegisterTable({
                 <td className="px-2 py-1.5">{r.category ?? "—"}</td>
                 <td className="px-2 py-1.5">
                   <StatusBadge status={r.status} />
+                  <span className="block text-xs text-gray-500">Stage {r.stage}</span>
                 </td>
                 <td className="px-2 py-1.5 whitespace-nowrap">{showDate(r.dateSubmitted)}</td>
                 <td className="px-2 py-1.5 text-right whitespace-nowrap">

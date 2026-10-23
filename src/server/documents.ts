@@ -16,6 +16,7 @@ import { verificationUrl } from "./app-url";
 import { certificatePdf } from "./pdf/certificate";
 import { deficiencyPdf } from "./pdf/deficiency";
 import { evaluationFormPdf } from "./pdf/evaluation-form";
+import { requireFinanceGate } from "./finance";
 import type { Actor, Db, Tx } from "./types";
 
 export const DOCUMENT_LABELS: Record<DocumentKind, string> = {
@@ -255,6 +256,7 @@ export async function generateAcknowledgement(
 /** Internal evaluation form EVAL-01, as it stands now. */
 export async function generateEvaluationForm(db: Db, actor: Actor, id: string, today = appToday()) {
   if (!can(actor.roles, "records.read")) throw new ForbiddenError();
+  await requireFinanceGate(db, actor, id, "Evaluation form", today);
   return db.$transaction(
     async (tx) => {
       const ctx = await loadContext(tx, today);
@@ -284,6 +286,7 @@ export async function previewDeficiencyNotice(
   if (!can(actor.roles, "deficiency.draft") && !can(actor.roles, "deficiency.issue")) {
     throw new ForbiddenError();
   }
+  await requireFinanceGate(db, actor, id, "Deficiency notice draft", today);
   const ctx = await loadContext(db, today);
   const state = await stateOrThrow(db, id, ctx);
   if (isClosed(state.sub.status))
@@ -312,6 +315,7 @@ export async function reissueCertificate(
   if (!can(actor.roles, "certificate.reissue")) throw new ForbiddenError();
   const parsed = reasonSchema.safeParse(input);
   if (!parsed.success) throw ValidationError.fromZod(parsed.error);
+  await requireFinanceGate(db, actor, id, "Certificate", today);
   return db.$transaction(
     async (tx) => {
       const ctx = await loadContext(tx, today);

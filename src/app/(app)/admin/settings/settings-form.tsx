@@ -31,6 +31,9 @@ function toValues(s: Settings): Values {
     lateChargeBlocksCompleteness: s.policy.lateChargeBlocksCompleteness,
     waiverAppliesToLateCharge: s.policy.waiverAppliesToLateCharge,
     flagsBlockApproval: s.policy.flagsBlockApproval,
+    lateChargeRequiredForRelease: s.policy.lateChargeRequiredForRelease,
+    unpaidReminderDays:
+      s.policy.unpaidReminderDays === null ? "" : String(s.policy.unpaidReminderDays),
   };
 }
 
@@ -206,6 +209,43 @@ export function SettingsForm({ settings }: { settings: Settings }) {
               name="tinPattern"
               defaultValue={text("tinPattern")}
               className={`${inputClass} font-mono`}
+            />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Finance confirmation gate (undecided policy, SPEC §4.12)">
+        <div className="space-y-3">
+          <label className="flex gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="lateChargeRequiredForRelease"
+              defaultChecked={v.lateChargeRequiredForRelease === true}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Late charge required to release for evaluation</span>
+              <span className="block text-xs text-gray-500">
+                Off: confirmed payments must cover the fee less any waiver. On: they must cover the
+                total due, late charge included. Applies to every submission from the moment it is
+                saved; any that then qualify are released at once.
+              </span>
+            </span>
+          </label>
+          <Field
+            label="Unpaid acknowledgement reminder after (days)"
+            name="unpaidReminderDays"
+            errors={errors}
+            hint="Blank: no automatic action. When set, unpaid submissions older than this are marked “reminder due” on the dashboard queue and counted in the daily review. No messages are sent."
+          >
+            <input
+              id="unpaidReminderDays"
+              name="unpaidReminderDays"
+              type="number"
+              min={1}
+              step={1}
+              defaultValue={text("unpaidReminderDays")}
+              className={`${inputClass} max-w-32`}
             />
           </Field>
         </div>

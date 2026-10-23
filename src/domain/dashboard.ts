@@ -1,6 +1,7 @@
 import { daysBetween, yearOf } from "./dates";
 import { existingOperatorDeadline } from "./deadlines";
 import type { EvaluationStatus } from "./evaluation";
+import { countsAsPaid, isWithFinance } from "./fees";
 import type { DataFlag } from "./flags";
 import type { OwnUseAssessment, OwnUseInput } from "./own-use";
 import type { ReferenceData, Settings } from "./reference";
@@ -37,7 +38,7 @@ export interface DashboardInput {
   lgas: readonly string[];
   submissions: readonly DashboardSubmission[];
   ownUse: readonly DashboardOwnUse[];
-  /** Every payment (submissions and own-use), including reversed ones (excluded here). */
+  /** Every payment (submissions and own-use); only Finance-confirmed, unreversed ones count. */
   payments: readonly PaymentInput[];
   /** Show January–December of this year in the monthly charts instead of the default window. */
   monthYear?: number | null;
@@ -68,6 +69,8 @@ export interface Dashboard {
   keyDates: { effectiveDate: IsoDate; registrationDeadline: IsoDate; daysToDeadline: number };
   submissions: {
     total: number;
+    /** Acknowledged, waiting for Finance to confirm payment (§4.12). */
+    awaitingPayment: number;
     registered: number;
     provisional: number;
     inProgress: number;
@@ -80,9 +83,11 @@ export interface Dashboard {
   money: {
     /** Due on live records: excludes Refused, Lapsed and Cancelled submissions. */
     totalDue: Kobo;
-    /** Every active payment received, whatever the record's status. */
+    /** Every payment confirmed by Finance (and not reversed), whatever the record's status. */
     collected: Kobo;
-    verified: Kobo;
+    /** Recorded but still waiting for Finance to confirm (not counted as collected). */
+    withFinance: Kobo;
+    withFinanceCount: number;
     /** Unpaid on live records. */
     outstanding: Kobo;
     /** Share of the live total due that has been paid: (due − outstanding) ÷ due; null if nothing is due. */
@@ -148,7 +153,8 @@ export function dashboardYears(effectiveDate: IsoDate, today: IsoDate): number[]
 
 export function buildDashboard(input: DashboardInput): Dashboard {
   const { submissions: subs, ownUse, settings, today } = input;
-  const activePayments = input.payments.filter((p) => p.status !== "REVERSED");
+  const confirmedPayments = input.payments.filter(countsAsPaid);
+  const pendingPayments = input.payments.filter(isWithFinance);
   const deadline = existingOperatorDeadline(settings);
   const statusOf = (s: DashboardSubmission) => s.sub.status!;
 
@@ -164,7 +170,7 @@ export function buildDashboard(input: DashboardInput): Dashboard {
   const outstanding =
     sum(live, (s) => Math.max(0, s.assessment.fees.balance)) +
     sum(ownUse, (o) => Math.max(0, o.assessment.balance));
-  const collected = sum(activePayments, (p) => p.amount);
+  const collected = sum(confirmedPayments, (p) => p.amount);
   const overpaidSubs = subs.filter((s) => s.assessment.fees.balance < 0);
   const overpaidOwnUse = ownUse.filter((o) => o.assessment.balance < 0);
 
@@ -208,7 +214,7 @@ export function buildDashboard(input: DashboardInput): Dashboard {
       (s) => s.sub.certificateIssueDate && monthOf(s.sub.certificateIssueDate) === month,
     ).length,
     collected: sum(
-      activePayments.filter((p) => monthOf(p.dateReceived) === month),
+      confirmedPayments.filter((p) => monthOf(p.dateReceived) === month),
       (p) => p.amount,
     ),
   }));
@@ -219,7 +225,8 @@ export function buildDashboard(input: DashboardInput): Dashboard {
     "Ready for decision": 0,
     Decided: 0,
   };
-  for (const s of subs) evaluation[s.evaluationStatus]++;
+  // Submissions awaiting payment are not in evaluation yet.
+  for (const s of subs) if (statusOf(s) !== STATUS.AWAITING) evaluation[s.evaluationStatus]++;
 
   return {
     keyDates: {
@@ -229,6 +236,7 @@ export function buildDashboard(input: DashboardInput): Dashboard {
     },
     submissions: {
       total: subs.length,
+      awaitingPayment: subs.filter((s) => statusOf(s) === STATUS.AWAITING).length,
       registered: subs.filter((s) => statusOf(s) === STATUS.REGISTERED).length,
       provisional: subs.filter((s) => statusOf(s) === STATUS.PROVISIONAL).length,
       inProgress: subs.filter((s) => IN_PROGRESS.includes(statusOf(s))).length,
@@ -246,10 +254,8 @@ export function buildDashboard(input: DashboardInput): Dashboard {
     money: {
       totalDue,
       collected,
-      verified: sum(
-        activePayments.filter((p) => p.verifiedWithBank === "Y"),
-        (p) => p.amount,
-      ),
+      withFinance: sum(pendingPayments, (p) => p.amount),
+      withFinanceCount: pendingPayments.length,
       outstanding,
       collectionRate: totalDue > 0 ? (totalDue - outstanding) / totalDue : null,
       unpaidOnClosed: sum(subs.filter(writtenOff), (s) => Math.max(0, s.assessment.fees.balance)),
@@ -295,6 +301,12 @@ export interface QueueItem {
   roles: string[];
   /** Overdue deficiencies: days past the response date. */
   daysOverdue?: number;
+  /** Awaiting payment: days since acknowledgement (date submitted). */
+  daysWaiting?: number;
+  /** Awaiting payment: at or past the "unpaid acknowledgement reminder" setting. */
+  reminderDue?: boolean;
+  /** Awaiting payment: process stage label (awaiting payment / with Finance / confirmed). */
+  stage?: string;
   determinationDue: IsoDate | null;
 }
 
@@ -307,7 +319,12 @@ export interface QueueSubmission extends DashboardSubmission {
   finalDecision: string | null;
 }
 
-export function workQueues(rows: readonly QueueSubmission[], userId: string, today: IsoDate) {
+export function workQueues(
+  rows: readonly QueueSubmission[],
+  userId: string,
+  today: IsoDate,
+  reminderDays: number | null = null,
+) {
   const item = (s: QueueSubmission, extra: Partial<QueueItem> = {}): QueueItem => ({
     id: s.sub.id,
     ackNo: s.sub.ackNo!,
@@ -318,7 +335,9 @@ export function workQueues(rows: readonly QueueSubmission[], userId: string, tod
     determinationDue: s.assessment.determinationDue,
     ...extra,
   });
-  const open = rows.filter((s) => !isClosed(s.sub.status));
+  const awaiting = rows.filter((s) => s.sub.status === STATUS.AWAITING);
+  // Evaluation queues: released submissions only (awaiting-payment ones cannot be evaluated yet).
+  const open = rows.filter((s) => !isClosed(s.sub.status) && s.sub.status !== STATUS.AWAITING);
 
   const mine = open
     .filter((s) => !s.finalDecision)
@@ -347,5 +366,16 @@ export function workQueues(rows: readonly QueueSubmission[], userId: string, tod
     .map((s) => item(s))
     .sort((a, b) => (a.determinationDue ?? "9999").localeCompare(b.determinationDue ?? "9999"));
 
-  return { mine, overdueDeficiency, readyForDecision };
+  const awaitingPayment = awaiting
+    .map((s) => {
+      const daysWaiting = s.sub.dateSubmitted ? daysBetween(s.sub.dateSubmitted, today) : 0;
+      return item(s, {
+        daysWaiting,
+        reminderDue: reminderDays !== null && daysWaiting >= reminderDays,
+        stage: s.assessment.processStage.label,
+      });
+    })
+    .sort((a, b) => (b.daysWaiting ?? 0) - (a.daysWaiting ?? 0));
+
+  return { mine, overdueDeficiency, readyForDecision, awaitingPayment };
 }

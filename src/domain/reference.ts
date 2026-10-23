@@ -49,6 +49,16 @@ export interface Policy {
   flagsBlockApproval: boolean;
   /** §9.7: regular expression for TIN; null = not validated until Finance confirms the format. */
   tinPattern: string | null;
+  /**
+   * Finance gate (undecided policy; default off): confirmed payments must cover the total due,
+   * late charge included, instead of fee − waiver before release for evaluation.
+   */
+  lateChargeRequiredForRelease: boolean;
+  /**
+   * Days after acknowledgement before an unpaid submission shows "reminder due" on the dashboard
+   * queue (undecided policy; default null = no reminder, no automatic action).
+   */
+  unpaidReminderDays: number | null;
 }
 
 export interface Settings {
@@ -79,6 +89,8 @@ export const DEFAULT_POLICY: Policy = {
   waiverAppliesToLateCharge: false,
   flagsBlockApproval: false,
   tinPattern: null,
+  lateChargeRequiredForRelease: false,
+  unpaidReminderDays: null,
 };
 
 // Shape of seed-data.json (only the parts read here).

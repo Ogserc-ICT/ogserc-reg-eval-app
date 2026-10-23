@@ -76,6 +76,13 @@ export const settingsSchema = z.object({
   lateChargeBlocksCompleteness: z.boolean(),
   waiverAppliesToLateCharge: z.boolean(),
   flagsBlockApproval: z.boolean(),
+  lateChargeRequiredForRelease: z.boolean(),
+  unpaidReminderDays: z
+    .string()
+    .trim()
+    .refine((s) => s === "" || /^\d+$/.test(s), "Whole days only, or leave blank")
+    .transform((s) => (s === "" ? null : Number(s)))
+    .refine((n) => n === null || (n >= 1 && n <= 3650), "Between 1 and 3,650 days, or blank"),
   tinPattern: z
     .string()
     .trim()

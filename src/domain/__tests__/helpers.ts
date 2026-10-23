@@ -72,6 +72,9 @@ export function makeSubmission(overrides: Partial<SubmissionInput> = {}): Submis
     remarks: null,
     documents: allDocs(null),
     pricing: null,
+    // Released for evaluation (Finance-confirmed) unless a test says otherwise (§4.12).
+    releasedForEvaluationDate: ED,
+    dateEvaluationStarted: null,
     ...overrides,
   };
 }
@@ -97,8 +100,14 @@ export function ctx(today = ED, s: Settings = settings): DomainContext {
   return { ref, settings: s, today };
 }
 
-export function payment(reference: string, naira: number, dateReceived = ED): PaymentInput {
-  return { reference, amount: nairaToKobo(naira), dateReceived };
+/** A payment, confirmed by Finance unless stated (only confirmed payments count, §4.12). */
+export function payment(
+  reference: string,
+  naira: number,
+  dateReceived = ED,
+  financeStatus: PaymentInput["financeStatus"] = "CONFIRMED",
+): PaymentInput {
+  return { reference, amount: nairaToKobo(naira), dateReceived, financeStatus };
 }
 
 export const naira = nairaToKobo;

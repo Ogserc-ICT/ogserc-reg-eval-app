@@ -26,6 +26,12 @@ const USERS = {
     password: "ade temp password",
     role: "Approving Officer",
   },
+  finance: {
+    name: "Fola Finance",
+    email: "fola@ogserc.test",
+    password: "fola temp password",
+    role: "Finance Officer",
+  },
 } as const;
 type Who = keyof typeof USERS;
 
@@ -75,6 +81,28 @@ async function newSubmission(page: Page, name: string, cac: string) {
   await expect(page.getByRole("heading", { name })).toBeVisible();
 }
 
+/** §4.12: Finance confirms the pending payment for a submission on the Finance Desk. */
+async function confirmOnFinanceDesk(browser: Browser, name: string) {
+  const page = await as(browser, "finance");
+  await page.getByRole("link", { name: "Finance Desk" }).click();
+  const row = page.getByRole("row").filter({ hasText: name });
+  await row.getByRole("button", { name: "Confirm…" }).click();
+  await row
+    .getByRole("checkbox", { name: /I have verified .* against the bank statement/ })
+    .check();
+  await row.getByRole("button", { name: "Confirm payment" }).click();
+  await expect(
+    page.getByText("Payment confirmed. The submission is released for evaluation."),
+  ).toBeVisible();
+}
+
+async function recordFee(page: Page) {
+  await page.getByRole("link", { name: "Record payment" }).click();
+  await page.getByLabel(/^Amount/).fill("250000");
+  await page.getByRole("button", { name: "Record payment" }).click();
+  await expect(page.getByText("Payment recorded.")).toBeVisible();
+}
+
 const SOLAR = "Abeokuta Solar Grid Ltd";
 const SLOW = "Odeda Slow Response Ltd";
 
@@ -105,10 +133,25 @@ test.describe.serial("Phase 4: evaluation and workflow", () => {
     }
     await page.getByRole("button", { name: "Save checklist" }).click();
     await expect(page.getByText(/^Checklist saved/)).toBeVisible();
-    await page.getByRole("link", { name: "Record payment" }).click();
-    await page.getByLabel(/^Amount/).fill("250000");
-    await page.getByRole("button", { name: "Record payment" }).click();
-    await expect(page.getByText("Payment recorded.")).toBeVisible();
+    await recordFee(page);
+  });
+
+  test("evaluation waits for Finance; Finance confirms on the Finance Desk", async ({
+    browser,
+  }) => {
+    const sup = await as(browser, "supervisor");
+    await openEvaluation(sup, SOLAR);
+    await expect(
+      sup
+        .getByRole("alert")
+        .filter({ hasText: "Evaluation is not available until Finance confirms" }),
+    ).toBeVisible();
+    await expect(sup.getByRole("button", { name: "Save checks" })).toHaveCount(0);
+
+    await confirmOnFinanceDesk(browser, SOLAR);
+
+    await sup.reload();
+    await expect(sup.getByText("Received - Under Review").first()).toBeVisible();
   });
 
   test("supervisor assigns the officers", async ({ browser }) => {
@@ -187,6 +230,8 @@ test.describe.serial("Phase 4: evaluation and workflow", () => {
   }) => {
     const reg = await as(browser, "registry");
     await newSubmission(reg, SLOW, "RC665544");
+    await recordFee(reg);
+    await confirmOnFinanceDesk(browser, SLOW);
 
     const sup = await as(browser, "supervisor");
     await openEvaluation(sup, SLOW);

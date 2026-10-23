@@ -202,6 +202,8 @@ describe("updateSettings", () => {
       ...policy,
       feesRevisedOn: rest.feesRevisedOn ?? "",
       tinPattern: policy.tinPattern ?? "",
+      unpaidReminderDays:
+        policy.unpaidReminderDays === null ? "" : String(policy.unpaidReminderDays),
     };
   };
 

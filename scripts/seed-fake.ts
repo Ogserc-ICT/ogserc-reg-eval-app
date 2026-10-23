@@ -127,7 +127,8 @@ const LICENCE_WEIGHTS: Record<string, number> = {
 };
 const STATUS_WEIGHTS = {
   REGISTERED: 45,
-  RECEIVED: 25,
+  AWAITING_PAYMENT: 8,
+  RECEIVED: 17,
   DEFICIENCY: 10,
   PROVISIONAL: 5,
   LAPSED: 5,
@@ -190,6 +191,8 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
   const staffSpec = [
     ["Fake Registry", "REGISTRY_OFFICER"],
     ["Fake Finance", "FINANCE_OFFICER"],
+    // A second Finance officer confirms what the first records (separation of duties, §4.12).
+    ["Fake Finance Confirmer", "FINANCE_OFFICER"],
     ["Fake Evaluator A", "EVALUATING_OFFICER"],
     ["Fake Evaluator B", "EVALUATING_OFFICER"],
     ["Fake Supervisor", "REVIEWING_SUPERVISOR"],
@@ -274,7 +277,11 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
         ? pricing.lateInitial + Math.min(pricing.lateDaily * daysLate, pricing.lateDailyCap)
         : 0;
     const waiver = chance(0.03) ? Math.round(pricing.registrationFee * 0.2) : 0;
-    const due = Math.max(0, pricing.registrationFee - waiver) + late;
+    const netFee = Math.max(0, pricing.registrationFee - waiver);
+    const due = netFee + late;
+    // Finance gate (§4.12): every status but these went through release for evaluation.
+    const awaiting = status === "AWAITING_PAYMENT";
+    const released = !awaiting && !["REFUSED", "CANCELLED"].includes(status);
 
     ackSeq++;
     const ackNo = formatAckNo(settings.ackPrefix, dateSubmitted, ackSeq);
@@ -315,22 +322,23 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
       );
     }
 
-    // Payments: what each kind of record typically has received.
+    // Payments: what each kind of record typically has received. Released records were confirmed
+    // for at least fee − waiver (the gate); some still owe their late charge.
     const paid =
       status === "REGISTERED" || status === "PROVISIONAL"
         ? chance(0.05)
           ? due + Math.round(between(1, 5)) * 1_000_000
           : due
-        : status === "RECEIVED"
-          ? chance(0.5)
+        : released
+          ? chance(0.7)
             ? due
-            : chance(0.5)
-              ? Math.round(due * between(0.2, 0.8))
-              : 0
-          : status === "DEFICIENCY"
-            ? chance(0.4)
-              ? Math.round(due * between(0.2, 0.9))
-              : 0
+            : netFee
+          : awaiting
+            ? chance(0.5)
+              ? due
+              : chance(0.4)
+                ? Math.round(due * between(0.2, 0.8))
+                : 0
             : chance(0.15)
               ? Math.round(due * 0.5)
               : 0;
@@ -353,8 +361,17 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
         channel: pick(["Remita", "Remita", "Bank transfer", "POS"]),
         amount: BigInt(amount),
         rrr: `RRR${Math.floor(between(1e11, 9e11))}`,
-        verifiedWithBank: !reversed && chance(0.7),
-        verifiedById: null,
+        // Awaiting payment: still with Finance. Otherwise confirmed by the second Finance officer.
+        ...(awaiting
+          ? { verifiedWithBank: false, verifiedById: null }
+          : {
+              verifiedWithBank: true,
+              verifiedById: staff["Fake Finance Confirmer"]!,
+              verifiedAt: fromIsoDate(received),
+              financeStatus: "CONFIRMED" as const,
+              financeDecidedById: staff["Fake Finance Confirmer"]!,
+              financeDecidedAt: fromIsoDate(received),
+            }),
         status: reversed ? "REVERSED" : "ACTIVE",
         reversalReason: reversed ? "FAKE DATA: posted twice" : null,
         reversedById: reversed ? staff["Fake Finance"] : null,
@@ -372,7 +389,6 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
           reversalReason: null,
           reversedById: null,
           reversedAt: null,
-          verifiedWithBank: chance(0.7),
         });
       }
     }
@@ -393,7 +409,10 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
       }))
       .filter((d): d is { documentNumber: number; value: "Y" | "N" | "NA" } => d.value !== null);
 
-    const assigned = status !== "RECEIVED" || chance(0.6);
+    const assigned = awaiting ? chance(0.3) : status !== "RECEIVED" || chance(0.6);
+    const releasedOn = released
+      ? clampToday(addDays(dateSubmitted, Math.floor(between(0, Math.max(1, Math.min(age, 10))))))
+      : null;
     const decision =
       status === "REGISTERED" || (status === "CANCELLED" && registrationNo)
         ? "REGISTER"
@@ -433,6 +452,7 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
         plannedStartDate: fromIsoDate(plannedStart),
         approvedWaiver: BigInt(waiver),
         status,
+        releasedForEvaluationDate: fromIsoDate(releasedOn),
         dateSubmissionComplete: fromIsoDate(clampToday(completeOn)),
         deficiencyNoticeDate: fromIsoDate(noticeOn),
         showCauseDate: status === "REFUSED" ? fromIsoDate(addDays(dateSubmitted, 5)) : null,
@@ -448,7 +468,8 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
           : null,
         reviewingSupervisorId: assigned ? staff["Fake Supervisor"] : null,
         approvingOfficerId: assigned ? staff["Fake Approver"] : null,
-        dateEvaluationStarted: assigned ? fromIsoDate(dateSubmitted) : null,
+        // Evaluation starts on release (§4.12).
+        dateEvaluationStarted: assigned && releasedOn ? fromIsoDate(releasedOn) : null,
         finalDecision: decision,
         reasons:
           status === "REFUSED"
@@ -576,8 +597,15 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
           ownUseNotificationId: oun.id,
           amount: BigInt(chance(0.05) ? pricing.fee * 2 : pricing.fee),
           channel: "Remita",
-          verifiedWithBank: chance(0.7),
           recordedById: staff["Fake Finance"]!,
+          ...(chance(0.85) && {
+            verifiedWithBank: true,
+            verifiedById: staff["Fake Finance Confirmer"]!,
+            verifiedAt: fromIsoDate(dateFiled),
+            financeStatus: "CONFIRMED" as const,
+            financeDecidedById: staff["Fake Finance Confirmer"]!,
+            financeDecidedAt: fromIsoDate(dateFiled),
+          }),
         },
       });
     }

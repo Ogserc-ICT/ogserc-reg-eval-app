@@ -12,6 +12,8 @@ export type YesNo = "Y" | "N";
 export type CheckValue = "Y" | "N" | "N/A" | null;
 
 export const STATUS = {
+  /** First status: acknowledged, waiting for Finance to confirm payment (the Finance gate). */
+  AWAITING: "Acknowledged - Awaiting Payment",
   RECEIVED: "Received - Under Review",
   DEFICIENCY: "Deficiency Notice Issued",
   PROVISIONAL: "Provisionally Registered",
@@ -63,7 +65,11 @@ export interface PaymentInput {
   verifiedWithBank?: YesNo | null;
   /** Reversed payments stay on record but are excluded from every total. */
   status?: "ACTIVE" | "REVERSED";
+  /** Finance decision. Only CONFIRMED payments count towards amounts paid (the Finance gate). */
+  financeStatus: FinanceStatus;
 }
+
+export type FinanceStatus = "PENDING" | "CONFIRMED" | "REJECTED";
 
 /** A Register row (SPEC §1.1) plus its document checklist (§1.2). */
 export interface SubmissionInput {
@@ -104,6 +110,10 @@ export interface SubmissionInput {
   documents: CheckValue[];
   /** Pricing frozen when the submission was saved; null for one not yet saved (priced live). */
   pricing: PricingSnapshot | null;
+  /** When confirmed payments first cleared the Finance gate (set by the release; locked). */
+  releasedForEvaluationDate: IsoDate | null;
+  /** From the evaluation (§1.3): when the evaluating officer started. */
+  dateEvaluationStarted: IsoDate | null;
 }
 
 /** Form OGSERC/EVAL-01 (SPEC §1.3). `checks` holds manually entered values keyed by check id. */

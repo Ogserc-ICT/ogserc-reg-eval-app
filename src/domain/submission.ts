@@ -8,6 +8,7 @@ import {
 } from "./deadlines";
 import { isSubmissionComplete, summariseDocuments, type DocumentSummary } from "./documents";
 import { feeSummary, type FeeSummary } from "./fees";
+import { financeGate, processStage, type FinanceGate, type ProcessStage } from "./finance";
 import { registrationNoInUse } from "./numbers";
 import { priceSubmission, pricingDifferences, type PricingSnapshot } from "./pricing";
 import type { ReferenceData, Settings } from "./reference";
@@ -50,6 +51,9 @@ export interface Assessment {
   daysInQueue: number | null;
   sla: SlaLight | null;
   registrationNoInUse: string | null;
+  /** Finance confirmation gate: confirmed payments against what release requires. */
+  financeGate: FinanceGate;
+  processStage: ProcessStage;
 }
 
 export function assessSubmission(
@@ -74,6 +78,7 @@ export function assessSubmission(
   const detDue = determinationDue(sub.dateSubmissionComplete, settings);
   const defDue = deficiencyResponseDue(sub.deficiencyNoticeDate, settings);
   const queue = daysInQueue(sub.status, sub.dateSubmitted, today);
+  const gate = financeGate(fees, sub.ackNo, payments, settings.policy);
   const applied = pricing?.category ?? null;
   return {
     primaryCode: activityCode(sub.primaryActivity, ref),
@@ -106,5 +111,7 @@ export function assessSubmission(
       settings,
     ),
     registrationNoInUse: registrationNoInUse(sub.registrationNo, sub.status, sub.ackNo),
+    financeGate: gate,
+    processStage: processStage(sub.status, gate),
   };
 }

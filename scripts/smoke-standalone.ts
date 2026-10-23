@@ -11,6 +11,7 @@ import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { generateAcknowledgement } from "../src/server/documents";
 import { createSubmission } from "../src/server/intake";
 import { ensureAdmin, seedReferenceData } from "../src/server/seed";
 import { hashSessionToken, newSessionToken } from "../src/server/session-store";
@@ -191,7 +192,9 @@ async function main() {
       dash.status === 200 && (await dash.text()).includes("Daily review"),
     );
 
-    const pdf = await get(`/submissions/${sub.id}/deficiency-draft`);
+    // The acknowledgement letter (available before payment; the Finance gate holds evaluation PDFs).
+    const letter = await generateAcknowledgement(db, { ...actor, roles: [...actor.roles] }, sub.id);
+    const pdf = await get(`/documents/${letter.id}`);
     const bytes = new Uint8Array(await pdf.arrayBuffer());
     check(
       "server renders a PDF with its fonts and logo",

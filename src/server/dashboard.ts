@@ -54,6 +54,6 @@ export async function getDashboard(
       payments: payments.map(paymentFromRow),
       monthYear,
     }),
-    queues: workQueues(rows, actor.id, ctx.today),
+    queues: workQueues(rows, actor.id, ctx.today, ctx.settings.policy.unpaidReminderDays),
   };
 }

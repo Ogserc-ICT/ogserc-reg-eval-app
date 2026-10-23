@@ -67,6 +67,7 @@ const stateInclude = {
     include: {
       recordedBy: { select: { name: true } },
       verifiedBy: { select: { name: true } },
+      financeDecidedBy: { select: { name: true } },
       reversedBy: { select: { name: true } },
     },
   },
@@ -207,6 +208,7 @@ export async function loadEvaluationStates(
         documentNumber: Number(n),
         value: CHECK_VALUE_FROM_LABEL[v]!,
       })),
+      evaluation: { dateEvaluationStarted: ev.dateEvaluationStarted },
     };
     const evaluationRow: EvaluationRow = {
       ...ev,

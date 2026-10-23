@@ -81,11 +81,13 @@ const SETTINGS_TEXT = [
   "commissionerName",
   "feesRevisedOn",
   "tinPattern",
+  "unpaidReminderDays",
 ] as const;
 const SETTINGS_BOOL = [
   "lateChargeBlocksCompleteness",
   "waiverAppliesToLateCharge",
   "flagsBlockApproval",
+  "lateChargeRequiredForRelease",
 ] as const;
 
 export async function updateSettingsAction(_prev: ActionState, fd: FormData): Promise<ActionState> {

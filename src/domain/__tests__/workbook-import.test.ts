@@ -93,6 +93,9 @@ const context = (overrides: Partial<ImportContext["existing"]> = {}): ImportCont
   },
 });
 
+const AWAITING_WARNING =
+  'Imported as "Acknowledged - Awaiting Payment" (workbook status: Received - Under Review); Finance must confirm its payments to release it for evaluation';
+
 const messages = (plan: ReturnType<typeof planWorkbookImport>, level: string) =>
   plan.problems.filter((p) => p.level === level).map((p) => p.message);
 
@@ -103,7 +106,12 @@ describe("planWorkbookImport", () => {
     expect(plan.submissions).toHaveLength(1);
     const s = plan.submissions[0]!;
     expect(s).toMatchObject({ ackNo: ACK, ackSeq: 2 });
-    expect(s.data).toMatchObject({ primaryActivityCode: "MGD", status: "Received - Under Review" });
+    // §4.12: payments come in Pending, so the record waits for Finance like a new one.
+    expect(s.data).toMatchObject({
+      primaryActivityCode: "MGD",
+      status: "Acknowledged - Awaiting Payment",
+    });
+    expect(messages(plan, "warning")).toEqual([AWAITING_WARNING]);
     expect(s.pricing.category).toBe("E");
     expect(s.documents.every((d) => d === "Y")).toBe(true);
     expect(plan.pricingDifferences).toEqual([]);
@@ -252,6 +260,7 @@ describe("planWorkbookImport", () => {
       'Reviewing supervisor "Blessing Ade" is not a user with that role; left unassigned',
       'Approving officer "Nobody" is not a user with that role; left unassigned',
       'Check 2.2: "maybe" is not Y, N or N/A; left pending',
+      AWAITING_WARNING,
     ]);
   });
 
@@ -266,6 +275,7 @@ describe("planWorkbookImport", () => {
     expect(messages(plan, "warning")).toEqual([
       'CAC number "1234567899" is not RC/BN/IT + digits',
       'Phone "123" is not a Nigerian number',
+      AWAITING_WARNING,
     ]);
   });
 
