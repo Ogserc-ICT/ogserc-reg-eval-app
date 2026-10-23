@@ -1,0 +1,82 @@
+# Restore drill (run by hand monthly: Actions → "Restore drill" → Run workflow).
+# Fetches the newest off-site backup, restores it into a scratch database next to the live one,
+# compares record counts with the live database, then deletes the scratch database.
+# The live database is only read.
+name: Restore drill
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      RCLONE_REMOTE: ${{ secrets.RCLONE_REMOTE }}
+      RCLONE_CONFIG_OFFSITE_TYPE: ${{ secrets.RCLONE_CONFIG_OFFSITE_TYPE }}
+      RCLONE_CONFIG_OFFSITE_ACCOUNT: ${{ secrets.RCLONE_CONFIG_OFFSITE_ACCOUNT }}
+      RCLONE_CONFIG_OFFSITE_KEY: ${{ secrets.RCLONE_CONFIG_OFFSITE_KEY }}
+      RCLONE_CONFIG_OFFSITE_PROVIDER: ${{ secrets.RCLONE_CONFIG_OFFSITE_PROVIDER }}
+      RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID: ${{ secrets.RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY: ${{ secrets.RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_OFFSITE_REGION: ${{ secrets.RCLONE_CONFIG_OFFSITE_REGION }}
+      RCLONE_CONFIG_OFFSITE_ENDPOINT: ${{ secrets.RCLONE_CONFIG_OFFSITE_ENDPOINT }}
+      SCRATCH: ogserc_restore_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client tools matching the database, and rclone
+        run: |
+          # The official PostgreSQL apt repository has every version; pg_dump must match the server.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common rclone
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq postgresql-client-17
+          url="$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*(&|$)/\1/; s/[?&]$//')"
+          major="$(/usr/lib/postgresql/17/bin/psql -w -tA -c 'SHOW server_version_num' "$url" | cut -c1-2)"
+          echo "Database server: PostgreSQL $major"
+          sudo apt-get install -y -qq "postgresql-client-$major"
+          echo "/usr/lib/postgresql/$major/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch the newest backup
+        run: |
+          latest="$(rclone lsf "$RCLONE_REMOTE/daily/" | sort | tail -n 1)"
+          [ -n "$latest" ] || { echo "::error::No backups found in $RCLONE_REMOTE/daily/"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/drill"
+          rclone copy "$RCLONE_REMOTE/daily/$latest" "$RUNNER_TEMP/drill/"
+          echo "BACKUP_FILE=$RUNNER_TEMP/drill/$latest" >> "$GITHUB_ENV"
+          echo "Newest backup: $latest"
+
+      - name: Restore into a scratch database
+        run: sh deploy/scheduler/restore.sh "$BACKUP_FILE" "$SCRATCH"
+
+      - name: Compare with the live database
+        run: |
+          live="$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*(&|$)/\1/; s/[?&]$//')"
+          base="${live%%\?*}"; query=""; case "$live" in *\?*) query="?${live#*\?}" ;; esac
+          scratch="${base%/*}/$SCRATCH$query"
+          cat > "$RUNNER_TEMP/counts.sql" <<'SQL'
+          select (select count(*) from "Submission") || ' submissions, '
+            || (select count(*) from "Payment") || ' payments, '
+            || (select count(*) from "OwnUseNotification") || ' own-use, '
+            || (select count(*) from "AuditLog") || ' audit entries';
+          SQL
+          echo "Live now:        $(psql -w -tA -f "$RUNNER_TEMP/counts.sql" "$live")"
+          echo "Restored backup: $(psql -w -tA -f "$RUNNER_TEMP/counts.sql" "$scratch")"
+          echo "(The live database may have a few more records than last night's backup.)"
+
+      - name: Delete the scratch database
+        if: always()
+        run: |
+          live="$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*(&|$)/\1/; s/[?&]$//')"
+          base="${live%%\?*}"; query=""; case "$live" in *\?*) query="?${live#*\?}" ;; esac
+          psql -w -tA -c "DROP DATABASE IF EXISTS $SCRATCH" "${base%/*}/postgres$query"

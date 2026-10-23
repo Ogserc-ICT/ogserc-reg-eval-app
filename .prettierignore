@@ -1,0 +1,12 @@
+node_modules
+.next
+playwright-report
+test-results
+reference
+assets
+docs
+CLAUDE.md
+README.md
+seed-data.json
+package-lock.json
+.next-perf

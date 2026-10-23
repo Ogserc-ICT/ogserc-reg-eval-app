@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* OGSERC brand: green and gold, matched to assets/ogserc-logo.png */
+@theme {
+  --color-brand-50: #eef8f0;
+  --color-brand-100: #d5eedb;
+  --color-brand-600: #1f8a3a;
+  --color-brand-700: #18702f;
+  --color-brand-800: #135726;
+  --color-brand-900: #0e401c;
+  --color-gold-300: #fde68a;
+  --color-gold-400: #fcd34d;
+  --color-gold-500: #f5b800;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Chart roles (dataviz method; validated: green/violet pass every categorical check on white). */
+:root {
+  --viz-series-1: #1f8a3a;
+  --viz-series-2: #6250d6;
+  --viz-track: #d5eedb;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-muted: #6b6a66;
+  --viz-ink-2: #52514e;
+  --viz-surface: #ffffff;
+  --status-critical: #d03b3b;
+  --status-warning: #fab219;
+  --status-good: #0ca30c;
+}
+
+body {
+  background: #f6f7f6;
+  color: #1a1f1b;
+}

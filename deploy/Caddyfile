@@ -1,0 +1,32 @@
+{
+	# Let's Encrypt account email (expiry warnings). Optional.
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# The daily review is called inside the stack (scheduler → app:3000), never from outside.
+	@cron path /api/cron/*
+	respond @cron 404
+
+	# The workbook import uploads up to ~25 MB.
+	request_body {
+		max_size 30MB
+	}
+
+	# Caddy replaces X-Forwarded-For with the client's address, which the login throttle reads
+	# (right-most entry).
+	reverse_proxy app:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	log
+}

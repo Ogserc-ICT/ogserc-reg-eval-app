@@ -1,0 +1,695 @@
+{
+  "_source": "Extracted from OGSERC_Registration_and_Evaluation_System.xlsm (Order OGSERC/ORD/2026/001, fees revised 21 Oct 2026). Amounts in naira. Confirm against the gazetted Order.",
+  "settings": {
+    "Effective Date of the Order": {
+      "value": "2026-10-22 00:00:00",
+      "note": "PLACEHOLDER — replace with the gazetted Effective Date (para 2)."
+    },
+    "Registration Period (days)": {
+      "value": 60,
+      "note": "Para 11(1)."
+    },
+    "Extension of Registration Period (days)": {
+      "value": 0,
+      "note": "Para 25 — any extension granted by public notice."
+    },
+    "Registration deadline (existing operators)": {
+      "value": "2026-12-21 00:00:00",
+      "note": "Formula."
+    },
+    "New operators: register at least (days) before start": {
+      "value": 30,
+      "note": "Para 11(2)."
+    },
+    "Commission determination period (days)": {
+      "value": 30,
+      "note": "Para 13(1); provisional registration after this (para 13(4))."
+    },
+    "Deficiency response period (days)": {
+      "value": 14,
+      "note": "Para 13(1)(b)."
+    },
+    "Unlicensed operators: licence application within (days)": {
+      "value": 90,
+      "note": "Para 18(1)."
+    },
+    "Licence expiry window for renewal flag (days)": {
+      "value": 183,
+      "note": "Para 8(5) — six months."
+    },
+    "Amber warning: days before determination due": {
+      "value": 7,
+      "note": "Workflow traffic light."
+    },
+    "Own-use notification threshold (kW)": {
+      "value": 200,
+      "note": "Para 3(4): 200 kW to below 1 MW."
+    },
+    "Registration number prefix": {
+      "value": "OGSERC/REG",
+      "note": "Format: PREFIX/YEAR/CATEGORY-ACTIVITY/SERIAL."
+    },
+    "Acknowledgement number prefix": {
+      "value": "OGSERC/ACK",
+      "note": "Every submission (para 10(3)); the number during provisional registration (para 13(4))."
+    },
+    "Own-use notification number prefix": {
+      "value": "OGSERC/OUN",
+      "note": "Para 3(4)."
+    },
+    "Payment record prefix": {
+      "value": "OGSERC/PAY",
+      "note": "Payments ledger."
+    },
+    "Signatory: Chairman / Chief Executive Officer": {
+      "value": "[Name]",
+      "note": "Printed under the first signature line of the certificate."
+    },
+    "Signatory: Commissioner": {
+      "value": "[Name]",
+      "note": "Printed under the second signature line of the certificate."
+    }
+  },
+  "schedule3_fees": [
+    {
+      "category": "A",
+      "registration_fee": 1000000,
+      "late_initial": 1000000,
+      "late_daily": 200000,
+      "late_daily_cap": 20000000,
+      "late_tier": "1",
+      "description": "Successor distribution companies, including a multi-State licensee that is a successor distribution company, for all their activities in Ogun State"
+    },
+    {
+      "category": "B",
+      "registration_fee": 1000000,
+      "late_initial": 1000000,
+      "late_daily": 200000,
+      "late_daily_cap": 20000000,
+      "late_tier": "1",
+      "description": "Integrated utilities, for all their activities in Ogun State"
+    },
+    {
+      "category": "C",
+      "registration_fee": 500000,
+      "late_initial": 1000000,
+      "late_daily": 200000,
+      "late_daily_cap": 20000000,
+      "late_tier": "1",
+      "description": "Generation of 10 MW or more, whether for sale or captive use"
+    },
+    {
+      "category": "D",
+      "registration_fee": 300000,
+      "late_initial": 500000,
+      "late_daily": 100000,
+      "late_daily_cap": 10000000,
+      "late_tier": "2",
+      "description": "Generation of 1 MW to less than 10 MW, whether for sale or captive use"
+    },
+    {
+      "category": "E",
+      "registration_fee": 250000,
+      "late_initial": 500000,
+      "late_daily": 100000,
+      "late_daily_cap": 10000000,
+      "late_tier": "2",
+      "description": "Mini-grids and interconnected mini-grids"
+    },
+    {
+      "category": "F",
+      "registration_fee": 500000,
+      "late_initial": 1000000,
+      "late_daily": 200000,
+      "late_daily_cap": 20000000,
+      "late_tier": "1",
+      "description": "Distribution licensees other than successor distribution companies; trading and bulk supply"
+    },
+    {
+      "category": "G",
+      "registration_fee": 500000,
+      "late_initial": 1000000,
+      "late_daily": 200000,
+      "late_daily_cap": 20000000,
+      "late_tier": "1",
+      "description": "Private, estate and industrial-park networks"
+    },
+    {
+      "category": "H",
+      "registration_fee": 250000,
+      "late_initial": 500000,
+      "late_daily": 100000,
+      "late_daily_cap": 10000000,
+      "late_tier": "2",
+      "description": "Metering service providers"
+    },
+    {
+      "category": "I",
+      "registration_fee": 100000,
+      "late_initial": 0,
+      "late_daily": 0,
+      "late_daily_cap": 0,
+      "late_tier": null,
+      "description": "Own-use generation notification under paragraph 3(4) (200 kW to below 1 MW)"
+    },
+    {
+      "category": "J",
+      "registration_fee": 250000,
+      "late_initial": 500000,
+      "late_daily": 100000,
+      "late_daily_cap": 10000000,
+      "late_tier": "2",
+      "description": "Franchisees and sub-franchisees"
+    },
+    {
+      "category": "K",
+      "registration_fee": 100000,
+      "late_initial": 100000,
+      "late_daily": 10000,
+      "late_daily_cap": 2000000,
+      "late_tier": "3",
+      "description": "Any other activity below 1 MW"
+    }
+  ],
+  "activities": [
+    {
+      "name": "Successor distribution company (incl. multi-State)",
+      "code": "SDC",
+      "cat_10mw_plus": "A",
+      "cat_1_to_10mw": "A",
+      "cat_below_1mw": "A",
+      "capacity_based": false
+    },
+    {
+      "name": "Integrated generation and distribution (integrated utility)",
+      "code": "INT",
+      "cat_10mw_plus": "B",
+      "cat_1_to_10mw": "B",
+      "cat_below_1mw": "B",
+      "capacity_based": false
+    },
+    {
+      "name": "Generation for sale (on-grid / off-grid / embedded)",
+      "code": "GEN",
+      "cat_10mw_plus": "C",
+      "cat_1_to_10mw": "D",
+      "cat_below_1mw": "K",
+      "capacity_based": true
+    },
+    {
+      "name": "Captive generation (1 MW or more)",
+      "code": "CPT",
+      "cat_10mw_plus": "C",
+      "cat_1_to_10mw": "D",
+      "cat_below_1mw": "D",
+      "capacity_based": true
+    },
+    {
+      "name": "Distribution – other licensee",
+      "code": "DIS",
+      "cat_10mw_plus": "F",
+      "cat_1_to_10mw": "F",
+      "cat_below_1mw": "F",
+      "capacity_based": false
+    },
+    {
+      "name": "Multi-State licensee – non-successor (Ogun operations)",
+      "code": "MSL",
+      "cat_10mw_plus": "F",
+      "cat_1_to_10mw": "F",
+      "cat_below_1mw": "F",
+      "capacity_based": false
+    },
+    {
+      "name": "Independent electricity distribution network",
+      "code": "IDN",
+      "cat_10mw_plus": "F",
+      "cat_1_to_10mw": "F",
+      "cat_below_1mw": "F",
+      "capacity_based": false
+    },
+    {
+      "name": "Trading / bulk supply",
+      "code": "TRD",
+      "cat_10mw_plus": "F",
+      "cat_1_to_10mw": "F",
+      "cat_below_1mw": "F",
+      "capacity_based": false
+    },
+    {
+      "name": "Supply / retail",
+      "code": "SUP",
+      "cat_10mw_plus": "K",
+      "cat_1_to_10mw": "K",
+      "cat_below_1mw": "K",
+      "capacity_based": false
+    },
+    {
+      "name": "Mini-grid / interconnected mini-grid",
+      "code": "MGD",
+      "cat_10mw_plus": "E",
+      "cat_1_to_10mw": "E",
+      "cat_below_1mw": "E",
+      "capacity_based": true
+    },
+    {
+      "name": "Private / estate / industrial-park network",
+      "code": "EST",
+      "cat_10mw_plus": "G",
+      "cat_1_to_10mw": "G",
+      "cat_below_1mw": "G",
+      "capacity_based": false
+    },
+    {
+      "name": "Franchise / sub-franchise",
+      "code": "FRN",
+      "cat_10mw_plus": "J",
+      "cat_1_to_10mw": "J",
+      "cat_below_1mw": "J",
+      "capacity_based": false
+    },
+    {
+      "name": "Metering services",
+      "code": "MET",
+      "cat_10mw_plus": "H",
+      "cat_1_to_10mw": "H",
+      "cat_below_1mw": "H",
+      "capacity_based": false
+    },
+    {
+      "name": "Other activity",
+      "code": "OTH",
+      "cat_10mw_plus": "C",
+      "cat_1_to_10mw": "D",
+      "cat_below_1mw": "K",
+      "capacity_based": true
+    }
+  ],
+  "lgas": [
+    "Abeokuta North",
+    "Abeokuta South",
+    "Ado-Odo/Ota",
+    "Ewekoro",
+    "Ifo",
+    "Ijebu East",
+    "Ijebu North",
+    "Ijebu North East",
+    "Ijebu Ode",
+    "Ikenne",
+    "Imeko Afon",
+    "Ipokia",
+    "Obafemi Owode",
+    "Odeda",
+    "Odogbolu",
+    "Ogun Waterside",
+    "Remo North",
+    "Sagamu",
+    "Yewa North",
+    "Yewa South"
+  ],
+  "statuses": [
+    "Received - Under Review",
+    "Deficiency Notice Issued",
+    "Provisionally Registered",
+    "Registered",
+    "Lapsed",
+    "Refused",
+    "Cancelled"
+  ],
+  "registrant_types": [
+    "Company",
+    "Cooperative",
+    "Partnership",
+    "Sole Proprietor",
+    "Public Body",
+    "Community Organization"
+  ],
+  "licence_statuses": [
+    "OGSERC licence/permit",
+    "NERC licence (wholly in Ogun)",
+    "NERC licence (multi-State)",
+    "NERC registration/permit (mini-grid/captive)",
+    "Licence application pending",
+    "Unlicensed"
+  ],
+  "fuel_technologies": [
+    "Gas",
+    "Diesel",
+    "Solar PV",
+    "Solar + battery",
+    "Hybrid",
+    "Biomass",
+    "Other"
+  ],
+  "submission_channels": [
+    "By hand",
+    "Email",
+    "Online portal"
+  ],
+  "payment_channels": [
+    "Remita",
+    "Bank transfer",
+    "POS",
+    "Other"
+  ],
+  "payment_purposes": [
+    "Registration fee",
+    "Late registration charge",
+    "Fee and late charge"
+  ],
+  "final_decisions": [
+    "Register (13(1)(a))",
+    "Issue deficiency notice (13(1)(b))",
+    "Refuse (13(3)) - after show-cause",
+    "Treat as lapsed (13(2))",
+    "Provisional registration (13(4))",
+    "Redirect to OUN-01 / outside scope"
+  ],
+  "schedule2_documents": [
+    "1. CAC certificate & status report (or equivalent)",
+    "2. Memorandum & articles (or equivalent)",
+    "3. Copy of every licence / permit / registration",
+    "4. Single-line diagram",
+    "5. Asset register with GPS coordinates",
+    "6. Audited financials, 2 yrs (or para 12(2) alternative)",
+    "7. PPAs, gas, bulk supply & franchise agreements",
+    "8. Tariff orders / schedules applied",
+    "9. Customer enumeration summary",
+    "10. Environmental & safety permits / EIA",
+    "11. Board resolution or equivalent authorization",
+    "12. Evidence of registration fee payment",
+    "13. Multi-State: Ogun asset/customer register & boundary points"
+  ],
+  "evaluation_checks": [
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.1",
+      "text": "Acknowledgement number issued and submission entered in the Register"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.2",
+      "text": "Correct form used: REG-01 for operators; OUN-01 for own-use 200 kW to <1 MW"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.3",
+      "text": "Applicant carries out, or proposes to carry out, an activity in para 3(1)"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.4",
+      "text": "Not excluded under para 3(3) (federal transmission, grid-only sales, own-use <1 MW)"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.5",
+      "text": "Register searched: no existing registration under the same CAC number"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.6",
+      "text": "One registration covers all the applicant's activities and locations in Ogun State"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.7",
+      "text": "Multi-State licensee: submission limited to Ogun State operations"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.8",
+      "text": "Submitted on time (60 days from Effective Date / 30 days before start)"
+    },
+    {
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "id": "1.9",
+      "text": "If late: days late recorded and Schedule 3 Part B late charge calculated"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.1",
+      "text": "A. Identity: name, CAC number, date of incorporation, TIN and addresses"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.2",
+      "text": "B. Ownership: shareholders ≥5%, directors and beneficial owners"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.3",
+      "text": "C. Contact: managing director and compliance officer with phone and email"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.4",
+      "text": "D. Licences: every licence listed with authority, number and dates"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.5",
+      "text": "E. Activities: all ticked; one primary activity; start date given"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.6",
+      "text": "F. Service area: LGAs, towns, estates, feeders; cross-boundary (multi-State)"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.7",
+      "text": "G. Generation assets: plant, location, MW, fuel, connection point"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.8",
+      "text": "H. Network assets: substations (MVA), feeders (kV, km), transformers (kVA)"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.9",
+      "text": "I. Customers by class, metered/unmetered; top 20 customers"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.10",
+      "text": "J. 12 months of energy received, sent out, billed; billing and collection"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.11",
+      "text": "K. Tariffs by class and band, approving authority and order reference"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.12",
+      "text": "L. Contracts: PPAs, gas, bulk supply, bilateral and franchise"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.13",
+      "text": "M. HSE: incidents, fatalities and outages >24 h in last 24 months"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.14",
+      "text": "N. Confidentiality claims stated with reasons (if any)"
+    },
+    {
+      "stage": "STAGE 2 — SCHEDULE 1 FORM",
+      "id": "2.15",
+      "text": "O. Declaration signed and dated by authorized signatories; seal affixed"
+    },
+    {
+      "stage": "STAGE 3 — SCHEDULE 2 DOCUMENTS",
+      "id": "3.0",
+      "text": "All Schedule 2 documents received or not applicable"
+    },
+    {
+      "stage": "STAGE 3 — SCHEDULE 2 DOCUMENTS",
+      "id": "3.1",
+      "text": "Outstanding documents listed with reasons and acceptable completion date (12(4))"
+    },
+    {
+      "stage": "STAGE 3 — SCHEDULE 2 DOCUMENTS",
+      "id": "3.2",
+      "text": "Non-corporate applicant: equivalent documents provided (12(3))"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.1",
+      "text": "CAC details verified on the CAC public search"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.2",
+      "text": "Licence numbers and dates confirmed with OGSERC records and NERC's register"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.3",
+      "text": "Licence not expiring within 6 months of Effective Date (else renewal reminder) (8(5))"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.4",
+      "text": "Installed capacity agrees with single-line diagram and asset register"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.5",
+      "text": "GPS coordinates within Ogun State and the LGAs stated"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.6",
+      "text": "Customer numbers agree with the enumeration summary"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.7",
+      "text": "Energy balance plausible; loss and collection rates calculated"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.8",
+      "text": "Tariffs agree with the approved tariff order or schedule (8(2))"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.9",
+      "text": "Unlicensed operator: tariff not above Effective Date level (18(1)(c))"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.10",
+      "text": "Supply sources consistent with generation assets and energy received"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.11",
+      "text": "Service area checked against DisCo franchise maps for overlap (18(3))"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.12",
+      "text": "Any fatality or serious HSE incident referred to technical/safety unit"
+    },
+    {
+      "stage": "STAGE 4 — VERIFICATION",
+      "id": "4.13",
+      "text": "Site inspection completed, or not required (22)"
+    },
+    {
+      "stage": "STAGE 5 — CATEGORY AND FEES",
+      "id": "5.1",
+      "text": "Category agrees with activities and capacity (highest applies) (17(1))"
+    },
+    {
+      "stage": "STAGE 5 — CATEGORY AND FEES",
+      "id": "5.2",
+      "text": "Payment confirmed by Finance against designated account (17(1))"
+    },
+    {
+      "stage": "STAGE 5 — CATEGORY AND FEES",
+      "id": "5.3",
+      "text": "Waiver or reduction approved in writing (17(3))"
+    },
+    {
+      "stage": "STAGE 5 — CATEGORY AND FEES",
+      "id": "5.4",
+      "text": "Late charge correctly calculated and within Schedule 3 cap (19(1)–(2))"
+    },
+    {
+      "stage": "STAGE 5 — CATEGORY AND FEES",
+      "id": "5.5",
+      "text": "Fees and charges paid in full"
+    },
+    {
+      "stage": "STAGE 6 — CONFIDENTIALITY",
+      "id": "6.1",
+      "text": "Confidentiality claims logged, decided and applicant notified (15(3))"
+    },
+    {
+      "stage": "STAGE 6 — CONFIDENTIALITY",
+      "id": "6.2",
+      "text": "Information treated as confidential pending decision (15(3))"
+    },
+    {
+      "stage": "STAGE 6 — CONFIDENTIALITY",
+      "id": "6.3",
+      "text": "Personal data handled under the NDPA 2023 (15(4))"
+    },
+    {
+      "stage": "STAGE 6 — CONFIDENTIALITY",
+      "id": "6.4",
+      "text": "Public Register fields confirmed (15(2))"
+    },
+    {
+      "stage": "STAGE 7 — REGULATORY FLAGS",
+      "id": "7.1",
+      "text": "Unlicensed: licence application due date recorded and communicated (18)"
+    },
+    {
+      "stage": "STAGE 7 — REGULATORY FLAGS",
+      "id": "7.2",
+      "text": "Overlap with licensee's area referred for determination, notice and hearing (18(3))"
+    },
+    {
+      "stage": "STAGE 7 — REGULATORY FLAGS",
+      "id": "7.3",
+      "text": "Multi-State: ring-fencing plan, licence application, boundary register noted (7(3))"
+    },
+    {
+      "stage": "STAGE 7 — REGULATORY FLAGS",
+      "id": "7.4",
+      "text": "No suspected false information (else referred; show-cause first) (19(3), 20)"
+    },
+    {
+      "stage": "STAGE 7 — REGULATORY FLAGS",
+      "id": "7.5",
+      "text": "Own-use site of 1 MW+ on OUN-01 directed to REG-01 (3(3)(c))"
+    },
+    {
+      "stage": "STAGE 7 — REGULATORY FLAGS",
+      "id": "7.6",
+      "text": "Register data flags reviewed and resolved or explained"
+    },
+    {
+      "stage": "POST-APPROVAL ACTIONS",
+      "id": "9.1",
+      "text": "Certificate Issue Date entered and status 'Registered' in the Register"
+    },
+    {
+      "stage": "POST-APPROVAL ACTIONS",
+      "id": "9.2",
+      "text": "Registration number generated and locked (locked automatically on approval)"
+    },
+    {
+      "stage": "POST-APPROVAL ACTIONS",
+      "id": "9.3",
+      "text": "Certificate CERT-01 prepared, checked, signed and sealed (13(5))"
+    },
+    {
+      "stage": "POST-APPROVAL ACTIONS",
+      "id": "9.4",
+      "text": "Certificate issued to the registrant (date and mode recorded)"
+    },
+    {
+      "stage": "POST-APPROVAL ACTIONS",
+      "id": "9.5",
+      "text": "Registrant reminded: number on bills in 90 days; annual confirmation by 31 Jan"
+    },
+    {
+      "stage": "POST-APPROVAL ACTIONS",
+      "id": "9.6",
+      "text": "Public Register on the Commission's website updated (15(2))"
+    },
+    {
+      "stage": "POST-APPROVAL ACTIONS",
+      "id": "9.7",
+      "text": "Physical and electronic file closed and indexed"
+    }
+  ]
+}

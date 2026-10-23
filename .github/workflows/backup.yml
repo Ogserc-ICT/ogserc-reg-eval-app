@@ -1,0 +1,65 @@
+# Nightly encrypted database backup for the Vercel + Neon setup (docs/DEPLOYMENT-VERCEL.md).
+# Same script as the Docker scheduler (deploy/scheduler/backup.sh): pg_dump → AES-256 encryption with
+# BACKUP_PASSPHRASE → decrypted and read back as a check → copied to off-site storage with rclone.
+# GitHub emails the repository owner if a run fails.
+name: Nightly database backup
+
+on:
+  schedule:
+    - cron: "30 1 * * *" # 02:30 Africa/Lagos (GitHub may start scheduled runs a little late)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      RCLONE_REMOTE: ${{ secrets.RCLONE_REMOTE }}
+      RCLONE_CONFIG_OFFSITE_TYPE: ${{ secrets.RCLONE_CONFIG_OFFSITE_TYPE }}
+      RCLONE_CONFIG_OFFSITE_ACCOUNT: ${{ secrets.RCLONE_CONFIG_OFFSITE_ACCOUNT }}
+      RCLONE_CONFIG_OFFSITE_KEY: ${{ secrets.RCLONE_CONFIG_OFFSITE_KEY }}
+      RCLONE_CONFIG_OFFSITE_PROVIDER: ${{ secrets.RCLONE_CONFIG_OFFSITE_PROVIDER }}
+      RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID: ${{ secrets.RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY: ${{ secrets.RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_OFFSITE_REGION: ${{ secrets.RCLONE_CONFIG_OFFSITE_REGION }}
+      RCLONE_CONFIG_OFFSITE_ENDPOINT: ${{ secrets.RCLONE_CONFIG_OFFSITE_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the settings
+        run: |
+          missing=""
+          for v in DATABASE_URL BACKUP_PASSPHRASE RCLONE_REMOTE RCLONE_CONFIG_OFFSITE_TYPE; do
+            [ -n "$(printenv "$v")" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing (see docs/DEPLOYMENT-VERCEL.md, step 6)"
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client tools matching the database, and rclone
+        run: |
+          # The official PostgreSQL apt repository has every version; pg_dump must match the server.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common rclone
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq postgresql-client-17
+          url="$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*(&|$)/\1/; s/[?&]$//')"
+          major="$(/usr/lib/postgresql/17/bin/psql -w -tA -c 'SHOW server_version_num' "$url" | cut -c1-2)"
+          echo "Database server: PostgreSQL $major"
+          sudo apt-get install -y -qq "postgresql-client-$major"
+          echo "/usr/lib/postgresql/$major/bin" >> "$GITHUB_PATH"
+
+      - name: Back up, check and copy off-site
+        env:
+          BACKUP_ROOT: ${{ runner.temp }}/backups
+        run: sh deploy/scheduler/backup.sh

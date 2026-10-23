@@ -1,0 +1,5 @@
+# Times are Africa/Lagos (TZ in the image). Output goes to the container log (docker compose logs scheduler).
+# Daily review (SPEC §4.10)
+0 6 * * * /usr/local/bin/daily-review.sh > /proc/1/fd/1 2>&1
+# Nightly encrypted backup
+30 2 * * * /usr/local/bin/backup.sh > /proc/1/fd/1 2>&1

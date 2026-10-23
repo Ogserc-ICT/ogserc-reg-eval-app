@@ -1,0 +1,123 @@
+# Production stack for one small VPS. Run from this folder:
+#   docker compose up -d --build
+# Settings come from deploy/.env (copy .env.example). See docs/DEPLOYMENT.md.
+name: ogserc
+
+x-database-url: &database-url postgresql://ogserc:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/ogserc?schema=public
+
+services:
+  # PostgreSQL 16. Reachable only by the other containers (no published port).
+  db:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ogserc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ogserc
+      TZ: Africa/Lagos
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ogserc -d ogserc"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  # Runs once per deploy: database migrations, then the seed (reference data and the first admin;
+  # create-only, so it never overwrites anything already in the database).
+  migrate:
+    build:
+      context: ..
+      target: tools
+    image: ogserc-tools
+    command: ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: *database-url
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    networks: [internal]
+
+  # The web app. Published on the VPS's loopback only; the outside world reaches it through Caddy
+  # (or `tailscale serve` for a private-network setup).
+  app:
+    build:
+      context: ..
+      target: runner
+    image: ogserc-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: *database-url
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in deploy/.env}
+      APP_URL: ${APP_URL:-https://${APP_DOMAIN}}
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in deploy/.env}
+    ports:
+      - "${APP_BIND:-127.0.0.1:3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    networks: [internal, web]
+
+  # HTTPS in front of the app, with automatic Let's Encrypt certificates for APP_DOMAIN.
+  # Left out when COMPOSE_PROFILES does not include "public" (private-network setup).
+  caddy:
+    image: caddy:2.8.4-alpine
+    profiles: [public]
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    networks: [web]
+
+  # Nightly encrypted database backups (kept here and copied off-site) and the 06:00 daily review.
+  scheduler:
+    build: ./scheduler
+    image: ogserc-scheduler
+    restart: unless-stopped
+    environment:
+      TZ: Africa/Lagos
+      DATABASE_URL: *database-url
+      CRON_SECRET: ${CRON_SECRET}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?set BACKUP_PASSPHRASE in deploy/.env}
+      BACKUP_KEEP_DAILY: ${BACKUP_KEEP_DAILY:-14}
+      BACKUP_KEEP_WEEKLY: ${BACKUP_KEEP_WEEKLY:-8}
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+    env_file:
+      # Off-site storage credentials for rclone (optional; see offsite.env.example).
+      - path: ./offsite.env
+        required: false
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      app:
+        condition: service_healthy
+    networks: [internal, web]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  # No route to the internet: the database lives only here.
+  internal:
+    internal: true
+  web:
