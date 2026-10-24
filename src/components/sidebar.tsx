@@ -24,7 +24,9 @@ export function Sidebar({ user }: { user: Actor }) {
   }
 
   return (
-    <aside className="border-gold-500 bg-brand-800 flex w-56 shrink-0 flex-col border-r-4 text-white">
+    // Pinned to the viewport so the user details and Sign out stay visible however far the page
+    // scrolls; the nav scrolls on its own if it is ever taller than the screen.
+    <aside className="border-gold-500 bg-brand-800 sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r-4 text-white">
       <div className="bg-white px-4 py-3">
         <Image
           src="/ogserc-logo.png"
@@ -38,7 +40,7 @@ export function Sidebar({ user }: { user: Actor }) {
       <p className="text-gold-300 px-4 pt-3 pb-2 text-xs tracking-wide uppercase">
         Registration &amp; Evaluation
       </p>
-      <nav aria-label="Main" className="flex flex-col gap-0.5 px-2">
+      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2">
         {NAV.filter((item) => can(user.roles, item.permission)).map((item) => (
           <Link
             key={item.href}
@@ -49,13 +51,30 @@ export function Sidebar({ user }: { user: Actor }) {
           </Link>
         ))}
       </nav>
-      <div className="border-brand-700 mt-auto border-t px-4 py-3 text-sm">
+      <div className="border-brand-700 shrink-0 border-t px-4 py-3 text-sm">
         <Link href="/account" className="block font-medium hover:underline">
           {user.name}
         </Link>
         <p className="text-brand-100 text-xs">{user.roles.map((r) => ROLE_LABELS[r]).join(", ")}</p>
-        <form action={signOutAction} className="mt-2">
-          <button type="submit" className="text-gold-300 text-xs hover:underline">
+        <form action={signOutAction} className="mt-3">
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center gap-2 rounded bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
             Sign out
           </button>
         </form>
