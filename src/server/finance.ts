@@ -6,6 +6,7 @@ import { can } from "@/domain/roles";
 import { STATUS, type IsoDate } from "@/domain/types";
 import { reasonSchema } from "@/lib/schemas";
 import { writeAudit } from "./audit";
+import { notify, subjectOf } from "./notifications";
 import { appToday } from "./clock";
 import { loadContext } from "./context";
 import { BlockedError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -60,6 +61,7 @@ export async function releaseIfCleared(
     reference: state.sub.ackNo,
     detail: `${formatNaira(gate.confirmed)} confirmed of ${formatNaira(gate.required)} required (${trigger})`,
   });
+  await notify(tx, actorId, { kind: "released", sub: subjectOf(state) });
   return true;
 }
 
@@ -237,6 +239,18 @@ export async function rejectPayment(db: Db, actor: Actor, paymentId: string, inp
       action: "Payment rejected",
       reference: payment.reference,
       detail: `${payment.paymentNo} ${formatNaira(koboToNumber(payment.amount))}. Reason: ${parsed.data.reason}`,
+    });
+    await notify(tx, actor.id, {
+      kind: "paymentRejected",
+      paymentNo: payment.paymentNo,
+      reference: payment.reference,
+      recordedById: payment.recordedById,
+      reason: parsed.data.reason,
+      href: payment.submissionId
+        ? `/submissions/${payment.submissionId}`
+        : payment.ownUseNotificationId
+          ? `/own-use/${payment.ownUseNotificationId}`
+          : "/payments",
     });
   });
 }

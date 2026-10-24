@@ -2,6 +2,36 @@
 
 Decisions made during the build that refine `docs/SPEC.md`. Newest first. If this file and the spec disagree, this file wins; raise anything unclear.
 
+## 2026-10-24 — Live updates and notifications (not in the spec)
+
+### Live updates
+- Every open page checks `/api/live` every 15 seconds, only while its tab is visible, and again as soon as the tab is shown. Every state change writes an AuditLog row, so the newest row id serves as a version. When it changes, the page re-renders its data in place (`router.refresh()`), without a full reload.
+- No refresh happens while the user is typing in a field. It waits until they leave the field, so nothing they are entering is disturbed.
+- Polling, not a push connection, because Vercel functions cannot hold connections open. Expect a change to appear on other screens within about 15 seconds.
+- The check reads the session without extending it. Background polling is not user activity, so it does not delay the 4-minute inactivity sign-out.
+
+### Notifications
+- A bell at the top of every page, with a red badge showing the unread count. Clicking a notification marks it read and opens the record. "Mark all as read" clears the badge.
+- The rule is **notify the next person in line**: the officer assigned to the next step, or everyone with that role while nobody is assigned. The user who caused the event and inactive users are never notified. The rules live in `src/domain/notifications.ts`:
+
+| Event | Who is notified |
+|---|---|
+| New submission | Finance officers |
+| New own-use notification with a fee | Finance officers |
+| Payment recorded | Finance officers (to confirm) |
+| Payment rejected | The officer who recorded it |
+| Released for evaluation (payment confirmed) | The assigned evaluating officer; if none, reviewing supervisors (to assign) |
+| Officers assigned | Each newly assigned officer |
+| Submission marked complete | The assigned reviewing supervisor, else all reviewing supervisors |
+| Evaluation reviewed | The assigned approving officer, else all approving officers |
+| Deficiency notice issued | The registry officer who created the submission, and the evaluating officer |
+| Registered, refused, lapsed or cancelled | The creator and the assigned officers |
+| Provisional registration (daily review) | The assigned supervisor and approver, else all supervisors and approvers |
+
+- Notifications are written in the same transaction as the change, so they exist exactly when the change does.
+- Reading a notification is personal UI state, so it is not audited and does not trigger other users' live updates. Notifications are not records: they are never edited apart from the read time.
+- The bell lists the 30 most recent. There is no email or SMS yet.
+
 ## 2026-10-24 — Finance confirmation gate (Commission's updated workbook; SPEC §4.12)
 
 The rules are in SPEC §4.12. Choices made here, where the instruction left room:

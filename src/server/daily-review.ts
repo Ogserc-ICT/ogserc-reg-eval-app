@@ -4,6 +4,7 @@ import { can } from "@/domain/roles";
 import type { IsoDate } from "@/domain/types";
 import { dailyReview } from "@/domain/workflow";
 import { writeAudit } from "./audit";
+import { notify, subjectOf } from "./notifications";
 import { appToday } from "./clock";
 import { loadContext } from "./context";
 import { COUNTER, nextCounter } from "./counters";
@@ -50,6 +51,7 @@ export async function runDailyReview(db: Db, actor: Actor | null, opts: { today?
           reference: s.sub.ackNo,
           detail: `Determination due ${formatDate(s.assessment.determinationDue!)} passed with no decision (para 13(4)); registration no. in use ${s.sub.ackNo}`,
         });
+        await notify(tx, userId, { kind: "provisional", sub: subjectOf(s) });
       }
 
       const locked: string[] = [];

@@ -16,6 +16,7 @@ import {
   type SubmissionFields,
 } from "@/lib/schemas";
 import { writeAudit } from "./audit";
+import { notify, subjectOf } from "./notifications";
 import { loadContext } from "./context";
 import { COUNTER, nextCounter } from "./counters";
 import {
@@ -202,6 +203,17 @@ export async function createSubmission(
         `${v.registeredName} - Category ${pricing.pricedCategory}`,
         ...extras.filter(Boolean),
       ].join("; "),
+    });
+    await notify(tx, actor.id, {
+      kind: "submissionCreated",
+      sub: subjectOf({
+        row: submission,
+        evaluation: {
+          evaluatingOfficerId: v.evaluatingOfficerId,
+          reviewingSupervisorId: null,
+          approvingOfficerId: null,
+        },
+      }),
     });
     return submission;
   });

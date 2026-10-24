@@ -22,6 +22,7 @@ import {
 } from "@/domain/workflow";
 import { reasonSchema } from "@/lib/schemas";
 import { writeAudit } from "./audit";
+import { notify, subjectOf } from "./notifications";
 import { loadContext } from "./context";
 import { COUNTER, nextCounter } from "./counters";
 import {
@@ -193,6 +194,16 @@ export async function assignOfficers(
       reference: state.row.ackNo,
       detail: changes.join("; "),
     });
+    const newlyAssigned = Object.fromEntries(
+      OFFICER_FIELDS.flatMap(([field]) =>
+        next[field] && next[field] !== before[field] ? [[field, next[field]]] : [],
+      ),
+    );
+    await notify(tx, actor.id, {
+      kind: "officersAssigned",
+      sub: subjectOf({ row: state.row, evaluation: next }),
+      assigned: newlyAssigned,
+    });
     return changes.length;
   });
 }
@@ -305,6 +316,7 @@ export async function recordReview(db: Db, actor: Actor, id: string, opts: Workf
       reference: state.row.ackNo,
       detail: `${state.counts.satisfied} satisfied, ${state.counts.failed} failed, ${state.counts.pending} pending`,
     });
+    await notify(tx, actor.id, { kind: "reviewed", sub: subjectOf(state) });
   });
 }
 
@@ -377,6 +389,11 @@ export async function markSubmissionComplete(
           ? `; response to ${notice?.noticeRef ?? "deficiency notice"} received ${formatDate(today)}, back to Received - Under Review`
           : ""),
     });
+    await notify(tx, actor.id, {
+      kind: "submissionComplete",
+      sub: subjectOf(state),
+      determinationDue: result.determinationDue,
+    });
     return { changed: true as const, determinationDue: result.determinationDue };
   });
 }
@@ -448,6 +465,7 @@ export async function issueDeficiency(
       reference: sub.ackNo,
       detail: parts.join("; "),
     });
+    await notify(tx, actor.id, { kind: "deficiencyIssued", sub: subjectOf(state), responseDue });
     return { responseDue, noticeRef };
   });
 }
@@ -523,6 +541,7 @@ export async function approveAndRegister(
       reference: state.sub.ackNo,
       detail: changes.auditDetail + overridden,
     });
+    await notify(tx, actor.id, { kind: "decided", sub: subjectOf(state), outcome: "Registered" });
     return { registrationNo: changes.submission.registrationNo! };
   });
 }
@@ -553,6 +572,7 @@ export async function lapseSubmission(
       reference: state.sub.ackNo,
       detail: `No complete response by ${formatDate(state.assessment.deficiencyResponseDue!)} (para 13(2))`,
     });
+    await notify(tx, actor.id, { kind: "decided", sub: subjectOf(state), outcome: "Lapsed" });
   });
 }
 
@@ -650,6 +670,7 @@ export async function refuseSubmission(
       reference: state.sub.ackNo,
       detail: reasons,
     });
+    await notify(tx, actor.id, { kind: "decided", sub: subjectOf(state), outcome: "Refused" });
   });
 }
 
@@ -679,6 +700,7 @@ export async function cancelSubmission(
       reference: state.sub.ackNo,
       detail: `Was ${state.sub.status}. Reason: ${parsed.data.reason}`,
     });
+    await notify(tx, actor.id, { kind: "decided", sub: subjectOf(state), outcome: "Cancelled" });
   });
 }
 

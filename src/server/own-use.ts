@@ -13,6 +13,7 @@ import {
 import { can } from "@/domain/roles";
 import { ownUseSchema, reasonSchema, type OwnUseFields } from "@/lib/schemas";
 import { writeAudit } from "./audit";
+import { notify } from "./notifications";
 import { loadContext } from "./context";
 import { COUNTER, nextCounter } from "./counters";
 import {
@@ -123,6 +124,13 @@ export async function createOwnUse(
         `${v.name} - ${v.installedCapacityKw} kW - ${ownUseEligibility(v.installedCapacityKw, ctx.settings)}` +
         ` - fee ${formatNaira(pricing.fee)}` +
         (belowThreshold ? "; below threshold confirmed" : ""),
+    });
+    await notify(tx, actor.id, {
+      kind: "ownUseCreated",
+      id: row.id,
+      ounNo,
+      name: v.name,
+      fee: pricing.fee,
     });
     return row;
   });

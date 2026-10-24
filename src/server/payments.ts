@@ -3,6 +3,7 @@ import { formatPaymentNo } from "@/domain/numbers";
 import { can } from "@/domain/roles";
 import { paymentSchema, reasonSchema as reverseSchema } from "@/lib/schemas";
 import { writeAudit } from "./audit";
+import { notify } from "./notifications";
 import { loadContext } from "./context";
 import { COUNTER, nextCounter } from "./counters";
 import {
@@ -88,6 +89,12 @@ export async function recordPayment(
       detail:
         `${formatNaira(v.amount)} - ref ${v.rrr ?? "(none)"} - ${payment.paymentNo}` +
         (duplicate ? "; duplicate RRR confirmed" : ""),
+    });
+    await notify(tx, actor.id, {
+      kind: "paymentRecorded",
+      paymentNo: payment.paymentNo,
+      reference: v.reference,
+      amount: v.amount,
     });
     return payment;
   });
