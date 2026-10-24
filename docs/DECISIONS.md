@@ -260,7 +260,9 @@ The owner does not want to look after a server. **Production runs on Vercel, wit
 
 ### Sessions
 - Session tokens are 256-bit random values. Only their SHA-256 is stored.
-- Sessions expire after 8 hours idle and 12 hours absolute, enforced server-side. Deactivating a user ends their sessions.
+- Users are signed out after **4 minutes without activity** (mouse, keyboard, scroll or touch), with a countdown warning in the last minute. Activity in any open tab of the app counts for all of them. The login page then says why. (Changed on 2026-10-24; previously 8 hours idle.)
+- The server enforces its own idle expiry of 5 minutes as a backstop for when the browser timer cannot run (tab closed, laptop asleep). While the user is active, the browser refreshes the session every 30 seconds, so the backstop never cuts off an active user. Settings: `src/lib/session-timeout.ts`.
+- Sessions also end 12 hours after sign-in however active they are, enforced server-side. Deactivating a user ends their sessions.
 - Cookies are httpOnly and SameSite=Lax, and Secure in production.
 - Auth.js stays for now. Switching to Better Auth was considered and not done yet.
 

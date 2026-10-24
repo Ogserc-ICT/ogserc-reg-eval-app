@@ -7,6 +7,7 @@ import { loginSchema } from "@/lib/schemas";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/server/audit";
 import { attemptLogin, clientIp } from "@/server/login-throttle";
+import { SESSION_UPDATE_AGE_SECONDS } from "@/lib/session-timeout";
 import { SESSION_MAX_AGE_SECONDS, newSessionToken, sessionStore } from "@/server/session-store";
 
 // Session rows store a hash of the token; these methods replace the Prisma adapter's own.
@@ -35,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // Secure cookies in production regardless of how the proxy reports the protocol. Auth.js already
   // sets httpOnly and SameSite=Lax on the session cookie.
   useSecureCookies: process.env.NODE_ENV === "production",
-  session: { maxAge: SESSION_MAX_AGE_SECONDS, updateAge: 15 * 60 },
+  session: { maxAge: SESSION_MAX_AGE_SECONDS, updateAge: SESSION_UPDATE_AGE_SECONDS },
   pages: { signIn: "/login" },
   logger: {
     // Refused sign-ins are expected outcomes, not server errors.

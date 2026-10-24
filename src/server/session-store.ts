@@ -2,8 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Adapter, AdapterSession, AdapterUser } from "next-auth/adapters";
 import type { Db } from "./types";
 
-/** Sliding idle expiry (refreshed while in use). */
-export const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
+/** Sliding idle expiry (refreshed while in use); see src/lib/session-timeout.ts. */
+export { SESSION_MAX_AGE_SECONDS } from "@/lib/session-timeout";
 /** Hard cap from sign-in, however active the session is. */
 export const SESSION_ABSOLUTE_MAX_SECONDS = 12 * 60 * 60;
 
