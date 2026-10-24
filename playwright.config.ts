@@ -28,6 +28,8 @@ export default defineConfig({
   ],
   webServer: {
     command: `npx next dev -p ${port}`,
+    // Own build folder, so a test run never overwrites the files of a dev server already running.
+    env: { NEXT_DIST_DIR: ".next-e2e" },
     url: `http://localhost:${port}/login`,
     reuseExistingServer: false,
     timeout: 180_000,

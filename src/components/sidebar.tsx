@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ROLE_LABELS, can, type Permission } from "@/domain/roles";
 import { signOut } from "@/lib/auth";
 import type { Actor } from "@/server/types";
+import { SidebarNav } from "./sidebar-nav";
 
 // Links are hidden when the user lacks the permission; every page and action still checks on the server.
 // Pages without a route yet arrive in later phases.
@@ -40,17 +41,12 @@ export function Sidebar({ user }: { user: Actor }) {
       <p className="text-gold-300 px-4 pt-3 pb-2 text-xs tracking-wide uppercase">
         Registration &amp; Evaluation
       </p>
-      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2">
-        {NAV.filter((item) => can(user.roles, item.permission)).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="hover:bg-brand-700 focus-visible:outline-gold-400 rounded px-3 py-2 text-sm focus-visible:outline-2"
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+      <SidebarNav
+        items={NAV.filter((item) => can(user.roles, item.permission)).map(({ href, label }) => ({
+          href,
+          label,
+        }))}
+      />
       <div className="border-brand-700 shrink-0 border-t px-4 py-3 text-sm">
         <Link href="/account" className="block font-medium hover:underline">
           {user.name}

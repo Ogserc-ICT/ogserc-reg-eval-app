@@ -49,6 +49,7 @@ next-env.d.ts
 /.data
 /pdf-preview
 /.next-perf
+/.next-e2e
 
 # Production secrets and backups (deploy/)
 /deploy/.env

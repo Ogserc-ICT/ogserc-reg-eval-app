@@ -3,6 +3,7 @@
 node_modules
 .next
 .next-perf
+.next-e2e
 .data
 backups
 deploy/backups

@@ -10,3 +10,4 @@ README.md
 seed-data.json
 package-lock.json
 .next-perf
+.next-e2e
