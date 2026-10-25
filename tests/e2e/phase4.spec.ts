@@ -108,6 +108,8 @@ async function confirmOnFinanceDesk(browser: Browser, name: string) {
 async function recordFee(page: Page) {
   await page.getByRole("link", { name: "Record payment" }).click();
   await page.getByLabel(/^Amount/).fill("250000");
+  // The amount is shown as currency while typing.
+  await expect(page.getByLabel(/^Amount/)).toHaveValue("250,000");
   await page.getByRole("button", { name: "Record payment" }).click();
   await expect(page.getByText("Payment recorded.")).toBeVisible();
 }
