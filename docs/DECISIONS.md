@@ -9,6 +9,7 @@ Decisions made during the build that refine `docs/SPEC.md`. Newest first. If thi
 - **Storage:** one `technicalData` JSON column on the submission (migration `20261025200000_technical_sections`; existing records start empty). Validated on save against the definitions; unknown forms, sections and fields are dropped; blank table rows dropped; 12-month tables keep 12 rows at most. Money in kobo.
 - **Conditions:** "holds any licence" now follows the licence status, and the other eight conditions follow the answers wherever a field decides them; the part 1 yes/no questions are asked only where nothing decides them. The stored yes/no still applies while the deciding field is unanswered.
 - **Flags (they block approval without an override, like every flag):** the form filed's sections not complete; a stated capacity more than 1% away from the installed capacity. Checks 2.7–2.12 stay manual.
+- **Owner's decision (2026-10-25, after the build):** a submission cannot be approved until the form filed's sections are filled in or marked "does not apply". "Unresolved data flags block approval outright" stays on to enforce this; turning it off would let an approver override the flag with a written reason.
 - **Updates:** changed answers are listed field by field in "changes to apply" and copied to the registration on approval.
 - **Not done:** no PDF shows the sections yet (the acknowledgement letter and EVAL-01 are unchanged); no figures from the 12-month tables feed the dashboard.
 
