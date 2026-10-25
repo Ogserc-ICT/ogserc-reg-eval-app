@@ -84,6 +84,12 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     const sections = page.getByRole("region", { name: "REG-01E sections" });
     await expect(sections.getByText("Isolated mini-grid")).toBeVisible();
     await expect(sections.getByText("Ilaro")).toBeVisible();
+    // The history starts folded; its title bar opens it.
+    const history = page.getByText(/^History \(\d+ entr(y|ies)\)$/);
+    await expect(history).toBeVisible();
+    await expect(page.getByText("Times are Lagos time.")).toBeHidden();
+    await history.click();
+    await expect(page.getByText("Times are Lagos time.")).toBeVisible();
     await expect(nextAction(page)).toContainText(
       "Await payment of ₦250,000, then Finance confirmation",
     );

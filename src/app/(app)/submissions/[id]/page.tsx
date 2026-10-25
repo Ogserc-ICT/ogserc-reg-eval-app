@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FlagList, PaymentBadge, SlaBadge, StatusBadge } from "@/components/badges";
 import { PageHeader } from "@/components/page-header";
-import { Facts, Panel } from "@/components/panel";
+import { Facts, FoldedPanel, Panel } from "@/components/panel";
 import { serviceAreaText } from "@/domain/certificate";
 import { CONDITION_KEYS, CONDITION_LABELS } from "@/domain/forms";
 import { formatNaira } from "@/domain/money";
@@ -479,7 +479,9 @@ export default async function SubmissionPage({
         </Panel>
       </div>
 
-      <Panel title="History">
+      <FoldedPanel
+        title={`History (${d.audit.length} ${d.audit.length === 1 ? "entry" : "entries"})`}
+      >
         {d.audit.length ? (
           <ol className="space-y-1.5 text-sm">
             {d.audit.map((e) => (
@@ -503,7 +505,7 @@ export default async function SubmissionPage({
           <p className="text-sm text-gray-500">No history.</p>
         )}
         <p className="mt-2 text-xs text-gray-500">Times are Lagos time.</p>
-      </Panel>
+      </FoldedPanel>
     </div>
   );
 }
