@@ -27,6 +27,21 @@ export function Panel({
   );
 }
 
+/** A Panel that starts closed: its title bar opens it (no script needed). */
+export function FoldedPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="group rounded border border-gray-200 bg-white">
+      <summary className="text-brand-800 hover:bg-brand-50 flex cursor-pointer list-none items-center justify-between gap-3 rounded px-4 py-2 text-sm font-semibold">
+        <h2>{title}</h2>
+        <span aria-hidden="true" className="text-xs text-gray-500 group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+      <div className="border-t border-gray-100 p-4">{children}</div>
+    </details>
+  );
+}
+
 /** Label/value grid. */
 export function Facts({
   items,

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FlagList, PaymentBadge } from "@/components/badges";
 import { PageHeader } from "@/components/page-header";
-import { Facts, Panel } from "@/components/panel";
+import { Facts, FoldedPanel, Panel } from "@/components/panel";
 import { ownUseRegistrationBlockers } from "@/domain/own-use";
 import { can } from "@/domain/roles";
 import { db } from "@/lib/db";
@@ -265,7 +265,9 @@ export default async function OwnUseDetailPage({
         />
       </Panel>
 
-      <Panel title="History">
+      <FoldedPanel
+        title={`History (${d.audit.length} ${d.audit.length === 1 ? "entry" : "entries"})`}
+      >
         {d.audit.length ? (
           <ol className="space-y-1.5 text-sm">
             {d.audit.map((e) => (
@@ -282,7 +284,7 @@ export default async function OwnUseDetailPage({
         ) : (
           <p className="text-sm text-gray-500">No history.</p>
         )}
-      </Panel>
+      </FoldedPanel>
     </div>
   );
 }
