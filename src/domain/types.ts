@@ -1,5 +1,6 @@
 import type { Conditions } from "./forms";
 import type { PricingSnapshot } from "./pricing";
+import type { TechnicalData } from "./technical";
 
 /** Calendar date without time, "YYYY-MM-DD". Legal dates are stored and compared this way. */
 export type IsoDate = string;
@@ -155,8 +156,13 @@ export interface SubmissionInput {
   remarks: string | null;
   /** Stored checklist values by shared document key (absent = blank). */
   documents: Record<string, CheckValue>;
-  /** Yes/no answers that make conditional documents N/A (registration-forms.json `required_when`). */
+  /**
+   * Stored yes/no answers for the document conditions (registration-forms.json `required_when`).
+   * The licence status and the technical sections decide most of them (`effectiveConditions`).
+   */
   conditions: Conditions;
+  /** Answers to the category-specific sections, by form (technical-sections.json). */
+  technicalData: TechnicalData;
   /** Pricing frozen when the submission was saved; null for one not yet saved (priced live). */
   pricing: PricingSnapshot | null;
   /** When confirmed payments first cleared the Finance gate (set by the release; locked). */

@@ -26,6 +26,7 @@ import { getSubmissionDetail } from "@/server/register";
 import { PaymentsTable } from "../../payments/payments-table";
 import { recalculateAction, setWaiverAction, updateDocumentsAction } from "../actions";
 import { DocumentsPanel } from "./documents-panel";
+import { TechnicalPanel } from "./technical-panel";
 import { DocumentsForm, RecalculateForm, WaiverForm } from "./record-forms";
 
 const NOTICES: Record<string, string> = {
@@ -397,6 +398,12 @@ export default async function SubmissionPage({
         )}
       </Panel>
 
+      <TechnicalPanel
+        defs={d.ctx.ref.technical}
+        data={sub.technicalData}
+        progress={a.technical.forms}
+      />
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Registrant details">
           <Facts
@@ -438,8 +445,8 @@ export default async function SubmissionPage({
               ["Signatories", showText(signatoriesText(x))],
               [
                 "Document conditions",
-                CONDITION_KEYS.filter((k) => sub.conditions[k])
-                  .map((k) => `${CONDITION_LABELS[k]} ${sub.conditions[k] === "Y" ? "Yes" : "No"}`)
+                CONDITION_KEYS.filter((k) => a.conditions[k])
+                  .map((k) => `${CONDITION_LABELS[k]} ${a.conditions[k] === "Y" ? "Yes" : "No"}`)
                   .join("; ") || "—",
               ],
               ["Entered by", row.createdBy.name],

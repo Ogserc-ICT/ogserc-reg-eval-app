@@ -1050,6 +1050,7 @@ function toSubmissionInput(
     remarks: d.remarks,
     documents: s.documents,
     conditions: d.conditions,
+    technicalData: {},
     pricing: s.pricing,
     releasedForEvaluationDate: null,
     dateEvaluationStarted: s.evaluation.dateEvaluationStarted,

@@ -5,7 +5,10 @@ import { useActionState, useState } from "react";
 import { ConfirmBox } from "@/components/confirm-box";
 import { Field, FormMessage, SubmitButton, formKey, inputClass } from "@/components/form";
 import { MultiCheckField, RowsField } from "@/components/rows-field";
-import { CONDITION_KEYS, CONDITION_LABELS } from "@/domain/forms";
+import { TechnicalSections } from "@/components/technical-sections";
+import { categoryForActivity } from "@/domain/category";
+import { CONDITION_KEYS, CONDITION_LABELS, formCodeFor } from "@/domain/forms";
+import { conditionsDecidedBy, type TechnicalData } from "@/domain/technical";
 import { FILING_LABELS, type FilingType } from "@/domain/types";
 import type { ActionState } from "@/lib/action";
 import { CONDITION_FIELDS as CONDITION_FIELD } from "@/lib/schemas";
@@ -46,6 +49,14 @@ function More({
 
 const hasRows = (json: string | undefined) => !!json && json !== "[]";
 
+function parseJson<T>(json: string | undefined, fallback: T): T {
+  try {
+    return json ? (JSON.parse(json) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function SubmissionForm({
   mode,
   action,
@@ -68,6 +79,36 @@ export function SubmissionForm({
   const [formFiled, setFormFiled] = useState(v.formFiled ?? "");
   const [regNo, setRegNo] = useState(v.linkedRegistrationNo ?? "");
   const linked = filingType !== "NEW";
+  const [technical, setTechnical] = useState<TechnicalData>(() =>
+    parseJson<TechnicalData>(v.technicalData, {}),
+  );
+  const [otherCodes, setOtherCodes] = useState<string[]>(() =>
+    parseJson<string[]>(v.otherActivityCodes, []),
+  );
+  const [capacity, setCapacity] = useState(v.installedCapacityMw ?? "");
+
+  // The form filed's sections, then each other activity's form at this capacity (para 17(1)).
+  const capacityMw = Number(String(capacity).replace(/,/g, "")) || 0;
+  const otherForms = otherCodes
+    .map((code) => options.activities.find((a) => a.code === code))
+    .map((a) =>
+      a
+        ? categoryForActivity(a, capacityMw, {
+            supplyRetailCategory1MwPlus: options.supplyRetailCategory1MwPlus,
+          })
+        : null,
+    )
+    .filter((c): c is string => !!c && c !== "I")
+    .map(formCodeFor);
+  const technicalForms = [...new Set([formFiled, ...otherForms])].filter(
+    (f) => !!f && !!options.technical[f],
+  );
+  const formTitles = Object.fromEntries(options.forms.map((f) => [f.form, f.title]));
+  // The licence status and the sections' answers decide these; their yes/no question is not asked.
+  const decided = new Set([
+    "holds_any_licence",
+    ...conditionsDecidedBy(options.technical, technicalForms),
+  ]);
 
   const text = (
     name: string,
@@ -125,9 +166,9 @@ export function SubmissionForm({
   // Conditions used by the selected form's documents (all of them when other activities' forms
   // also apply). The others are kept as they are but not shown.
   const selectedForm = options.forms.find((f) => f.form === formFiled);
-  const shownConditions = options.otherActivitiesRequireDocuments
-    ? [...CONDITION_KEYS]
-    : (selectedForm?.conditions ?? []);
+  const shownConditions = (
+    options.otherActivitiesRequireDocuments ? [...CONDITION_KEYS] : (selectedForm?.conditions ?? [])
+  ).filter((k) => !decided.has(k));
   const hiddenConditions = CONDITION_KEYS.filter((k) => !shownConditions.includes(k));
 
   const ownershipFilled =
@@ -325,7 +366,7 @@ export function SubmissionForm({
         {text(
           "installedCapacityMw",
           "Installed capacity (MW)",
-          { inputMode: "decimal" },
+          { inputMode: "decimal", onChange: (ev) => setCapacity(ev.target.value) },
           "Sets the category for generation, captive, mini-grid and other activities",
         )}
         {text("customers", "Customers", { inputMode: "numeric" })}
@@ -335,9 +376,22 @@ export function SubmissionForm({
           options={activities}
           initial={v.otherActivityCodes}
           errors={e}
-          hint="Tick every other activity. The fee is for the highest category of all of them (para 17(1))."
+          hint="Tick every other activity. The fee is for the highest category of all of them (para 17(1)); each activity's form sections appear below."
+          onChange={setOtherCodes}
         />
       </Section>
+
+      <input type="hidden" name="technicalData" value={JSON.stringify(technical)} />
+      {technicalForms.length > 0 && (
+        <TechnicalSections
+          defs={options.technical}
+          forms={technicalForms}
+          titles={formTitles}
+          value={technical}
+          onChange={setTechnical}
+          errors={e?.technicalData}
+        />
+      )}
 
       {shownConditions.length > 0 && (
         <Section title="Documents that depend on the answers">

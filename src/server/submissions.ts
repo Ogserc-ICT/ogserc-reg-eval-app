@@ -8,6 +8,7 @@ import type {
 import type { OtherSubmission } from "@/domain/flags";
 import { CONDITION_KEYS, type ConditionKey, type Conditions } from "@/domain/forms";
 import type { PricingSnapshot } from "@/domain/pricing";
+import type { TechnicalData } from "@/domain/technical";
 import {
   STATUS,
   type CheckValue,
@@ -178,6 +179,8 @@ export function submissionFromRow(row: SubmissionRowLike): SubmissionInput {
       row.documents.map((d) => [d.documentKey, CHECK_FROM_DB[d.value]]),
     ),
     conditions: conditionsFromRow(row),
+    // Validated when saved (src/domain/technical.ts); answers to fields no longer defined are ignored.
+    technicalData: (row.technicalData ?? {}) as unknown as TechnicalData,
     pricing: pricingFromColumns(row),
     releasedForEvaluationDate: toIsoDate(row.releasedForEvaluationDate),
     dateEvaluationStarted: toIsoDate(row.evaluation?.dateEvaluationStarted ?? null),

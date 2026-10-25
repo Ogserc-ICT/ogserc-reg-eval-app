@@ -77,13 +77,18 @@ test.describe.serial("Phase 7: daily review, audit log, export, import, verifica
   test("an Admin uploads the workbook, reviews the preview and imports it", async ({
     page,
   }, testInfo) => {
+    // Upload, preview and import each run a server action over the whole workbook.
+    test.setTimeout(180_000);
     const file = await workbookFile(testInfo.outputDir);
     await page.goto("/admin");
     await page.getByRole("link", { name: /Import from the workbook/ }).click();
     await page.getByLabel("Workbook file").setInputFiles(file);
     await page.getByRole("button", { name: "Upload and check" }).click();
 
-    await expect(page.getByRole("heading", { name: "workbook-e2e.xlsx" })).toBeVisible();
+    // Reading the workbook is slow on a cold dev server.
+    await expect(page.getByRole("heading", { name: "workbook-e2e.xlsx" })).toBeVisible({
+      timeout: 60_000,
+    });
     const summary = page.getByRole("region", { name: "Summary" });
     await expect(summary).toContainText("Submissions1");
     await expect(summary).toContainText("Payments1");

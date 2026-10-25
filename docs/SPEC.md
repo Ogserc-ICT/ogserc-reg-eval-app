@@ -12,7 +12,7 @@ Users: **OGSERC staff only**. There is no public applicant portal in this versio
 
 ### 1.1 Submission (one per registrant, plus one per update or annual confirmation; the Excel "Register" row)
 
-Registrants file on the form for their Schedule 3 category: REG-01A to REG-01K (REG-01I is the own-use notification, §1.5). The common sections below are on every form except REG-01I; the category-specific technical sections come in part 2.
+Registrants file on the form for their Schedule 3 category: REG-01A to REG-01K (REG-01I is the own-use notification, §1.5). The common sections below are on every form except REG-01I; each form's category-specific sections are in §1.1a.
 
 Filing:
 - `filingType`*: New registration / Update: material change (para 16(1)) / Annual confirmation (para 16(2)). Never changes once saved (DB trigger).
@@ -55,6 +55,13 @@ Determination:
 - `status`*, `releasedForEvaluationDate` (set by the Finance gate release, §4.12; locked), `dateSubmissionComplete`, `deficiencyNoticeDate`, `certificateIssueDate`, `registrationNo` (locked when issued), `remarks`
 
 \* = required at intake.
+
+### 1.1a Category-specific sections (REG-01A to K; `technical-sections.json`)
+- Each form's own sections (e.g. REG-01D: generation activity, generating plant with fuel supply, grid connection and offtakers, operations for the last 12 months), defined in `technical-sections.json` as sections of fields, check lists, choices, editable tables, fixed grids (rows such as customer classes or asset types) and 12-month tables. Changing a form is an edit to that file; no migration is needed.
+- Answers are stored per form on the submission (`technicalData`) and validated against the definitions on the server; problems name the form, section, field and row. Money is integer kobo; other numbers are stored in the unit printed on the form (kW and kWh are converted to MW only to compare capacities).
+- The form shows the sections of the form filed (or, once re-categorised, of the confirmed category's form) and then those of each other activity's form at the installed capacity. All are optional: intake stays quick. Each section can be marked "does not apply". Answers for forms no longer shown are kept.
+- Completeness per section: complete when every field not marked optional is answered (a table or grid: at least one row); "does not apply" and sections whose condition is No (REG-01A's multi-State section) do not count.
+- Edits and approved updates record every changed answer, old → new.
 
 ### 1.2 DocumentChecklist (1:1 with Submission)
 The Schedule 2 list of the submission's form (`registration-forms.json`, seeded into `RegistrationForm` / `FormDocument`). Items are stored by their **shared key** (e.g. `incorporation` is the same document on every form), so a value carries over when the list changes (re-categorisation, §4.13). Each value is `Y` (received), `N` (outstanding), `N/A`, or blank (pending). Rows for keys not on the current list are kept but not shown. Some items are set automatically (§2.6) and cannot be set by hand. The uniform 13-item list (seed `schedule2_documents_legacy`) is kept only to read the workbook and migrate old records.
@@ -162,6 +169,8 @@ list = form.documents
          the items of each other activity's form (REG-01{its category}) not already on the list,
          matched by shared key; evidence of payment stays last
 ```
+Conditions in force (`effectiveConditions`): **holds any licence** follows the licence status (anything but Unlicensed); the others are decided by the category-specific answers where they give one (REG-01A business type → multi-State licensee; REG-01C/D activity → generation for sale, network connected to → grid connected; REG-01E type → interconnected; REG-01F Part 1 / Part 2 answered or marked "does not apply"; REG-01G source of supply → DisCo bulk supply; REG-01J role → sub-franchisee). A Yes from any form shown wins. Where nothing decides a condition, the stored yes/no applies; the form asks that question only where no answer covers it.
+
 Each item's value:
 ```
 evidence of payment  -> automatic: 'N/A' if fee − waiver is 0; 'Y' once Finance-confirmed payments
@@ -253,6 +262,7 @@ Each condition adds a flag:
 - Primary activity is generation-related and capacity ≥ 10 MW, but the applied category is not C (or A/B)
 - TIN or CAC number fails format validation
 - **Form filed (§4.13):** "Form filed (REG-01X) does not match the calculated category (Y) – confirm the category" until the category is confirmed; once confirmed as another category: no flag when wrong forms are accepted and a reason is recorded, "…the applicant must file on REG-01Y" when the correct form is required, "…with no reason recorded" otherwise.
+- **Category-specific sections:** "REG-01X sections not complete: …" lists the form's sections still empty or incomplete (not other activities'); "Installed capacity is N MW, but … gives M MW" when a capacity the sections state (a total-capacity field, or the total of a plant or asset table) differs from the installed capacity by more than 1%.
 - **Confirmed category not charged:** the confirmed category differs from the category charged (the pricing snapshot). Correct the activities or capacity, or override the category, then an admin recalculates. The evaluator's confirmation never changes a fee.
 - **Updates and annual confirmations (§4.14):** not linked to a registered submission; the linked registration is no longer Registered (while the filing is open); an annual confirmation filed after the due date in a year when one was due (the registration is from an earlier year).
 - **Annual confirmation overdue** (on a Registered new registration): registered before this year, today is after this year's due date (31 January), and no annual confirmation was filed this calendar year (one refused, lapsed or cancelled does not count).
@@ -573,4 +583,7 @@ Also show work queues: my assigned evaluations, overdue deficiency responses awa
 | Licences | expiries 2029 and ED + 100 days | renewal flag from the nearer one |
 | Own-use units | 400 + 250 kW | 650 kW, notification required, Category I fee |
 | Own-use certificate | setting off / on, paid, complete | blocked / `OGSERC/REG/{yyyy}/I-CPT/0001` and CERT-01 |
+| Technical sections | REG-01D, captive only, network "none" | offtake and connection agreements N/A automatically |
+| Technical sections | REG-01D plant table 3 + 1.5 MW, installed 5 MW | capacity flag; REG-01K 250 + 252 kW at 0.5 MW agrees |
+| Technical sections | REG-01D with two sections empty, operations "does not apply" | flag lists the two sections |
 | Migration | old record, category E, 13 items all Y, licence no. and expiry, secondary EST | REG-01E, New registration; 9 values carried over (7, 9, 12, 13 not); one licence row; EST as other activity; audit entry lists what was not carried over |

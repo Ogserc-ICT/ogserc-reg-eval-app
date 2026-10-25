@@ -20,7 +20,17 @@ export async function loadFormOptions(db: Db) {
     ref,
     settings,
   ] = await Promise.all([
-    db.activity.findMany({ orderBy: { sortOrder: "asc" }, select: { code: true, name: true } }),
+    db.activity.findMany({
+      orderBy: { sortOrder: "asc" },
+      select: {
+        code: true,
+        name: true,
+        cat10MwPlus: true,
+        cat1To10Mw: true,
+        catBelow1Mw: true,
+        capacityBased: true,
+      },
+    }),
     db.lga.findMany({ orderBy: { sortOrder: "asc" }, select: { name: true } }),
     db.feeCategory.findMany({
       orderBy: { category: "asc" },
@@ -66,6 +76,9 @@ export async function loadFormOptions(db: Db) {
     /** Other activities need their own form's documents: every condition may then apply. */
     otherActivitiesRequireDocuments: settings.policy.otherActivitiesRequireDocuments,
     hseTypes: [...HSE_TYPES],
+    /** Category-specific sections, and what decides which forms' sections the form shows. */
+    technical: ref.technical,
+    supplyRetailCategory1MwPlus: settings.policy.supplyRetailCategory1MwPlus,
   };
 }
 

@@ -1,4 +1,6 @@
 import formsFile from "../../registration-forms.json";
+import technicalFile from "../../technical-sections.json";
+import type { TechnicalDefs } from "@/domain/technical";
 import seedFile from "../../seed-data.json";
 import { referenceDataFromSeed, settingsFromSeed } from "@/domain/reference";
 import { writeAudit } from "./audit";
@@ -13,7 +15,9 @@ import type { Db } from "./types";
  * so re-running never overwrites values an admin has edited.
  */
 export async function seedReferenceData(db: Db): Promise<void> {
-  const ref = referenceDataFromSeed(seedFile, formsFile);
+  const ref = referenceDataFromSeed(seedFile, formsFile, {
+    forms: technicalFile.forms as unknown as TechnicalDefs,
+  });
   const settings = settingsFromSeed(seedFile);
 
   await db.$transaction(async (tx) => {

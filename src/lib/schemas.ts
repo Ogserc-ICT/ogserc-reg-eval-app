@@ -353,6 +353,21 @@ export const submissionSchema = z
     signatory2Designation: text(200),
     signatory2Date: datedField("Signature date"),
     ...conditionFields,
+    /** Category-specific sections (JSON from the form); checked against the definitions on the server. */
+    technicalData: z.preprocess(
+      (v) => {
+        if (v === undefined || v === null || v === "") return {};
+        if (typeof v === "string") {
+          try {
+            return JSON.parse(v);
+          } catch {
+            return null;
+          }
+        }
+        return v;
+      },
+      z.record(z.unknown(), { invalid_type_error: "The technical sections could not be read" }),
+    ),
     operatingOnEffectiveDate: z.enum(["Y", "N"], {
       errorMap: () => ({ message: "Say whether the operator was operating on the Effective Date" }),
     }),

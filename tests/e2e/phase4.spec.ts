@@ -79,6 +79,13 @@ async function newSubmission(page: Page, name: string, cac: string) {
     .selectOption("NERC registration/permit (mini-grid/captive)");
   await page.getByRole("button", { name: "+ Add licence" }).click();
   await page.getByLabel("Number, row 1").fill("NERC/MG/77");
+  // Its REG-01E sections are marked "does not apply", so no data flag holds up approval.
+  await page
+    .getByText("REG-01E — Mini-grids and interconnected mini-grids: category-specific sections")
+    .click();
+  for (const box of await page.getByRole("checkbox", { name: "Does not apply" }).all()) {
+    await box.check();
+  }
   await page.getByRole("button", { name: "Save submission" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
 }

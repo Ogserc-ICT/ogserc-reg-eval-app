@@ -13,9 +13,14 @@ import { recordPayment, reversePayment } from "@/server/payments";
 import type { Actor } from "@/server/types";
 import { assignOfficers, issueDeficiency } from "@/server/workflow";
 import { generateFakeData } from "../../scripts/seed-fake";
-import { makeUser, resetDb, testDb } from "./helpers";
+import { makeUser, resetDb, testDb, technicalAnswers } from "./helpers";
 
 const db = testDb();
+
+/** REG-01E's category-specific sections answered, at each capacity these tests use. */
+const TECHNICAL: Record<string, string> = {
+  "2": technicalAnswers("REG-01E", 2),
+};
 afterAll(() => db.$disconnect());
 
 const TODAY = "2026-10-22";
@@ -43,6 +48,7 @@ const form = (name: string, cac: string, lga: string) => ({
   primaryActivityCode: "MGD",
   filingType: "NEW",
   formFiled: "REG-01E",
+  technicalData: TECHNICAL["2"],
   installedCapacityMw: "2",
   customers: "",
   licenceStatus: "NERC registration/permit (mini-grid/captive)",

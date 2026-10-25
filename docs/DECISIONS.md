@@ -2,6 +2,16 @@
 
 Decisions made during the build that refine `docs/SPEC.md`. Newest first. If this file and the spec disagree, this file wins; raise anything unclear.
 
+## 2026-10-25 — Category forms REG-01A to K, part 2: category-specific sections (SPEC §1.1a)
+
+- **Owner's answers (asked before the build):** sections defined in a JSON file with one generic form and validator (not typed tables per form); the answers decide the document conditions; everything optional, with gaps and inconsistencies as data flags; other activities' sections shown too, optional.
+- **Definitions:** `technical-sections.json`, written from the Word forms (REG-01C and D share the generation sections). Not admin-editable; the app reads the file. REG-01I keeps its own-use form from part 1.
+- **Storage:** one `technicalData` JSON column on the submission (migration `20261025200000_technical_sections`; existing records start empty). Validated on save against the definitions; unknown forms, sections and fields are dropped; blank table rows dropped; 12-month tables keep 12 rows at most. Money in kobo.
+- **Conditions:** "holds any licence" now follows the licence status, and the other eight conditions follow the answers wherever a field decides them; the part 1 yes/no questions are asked only where nothing decides them. The stored yes/no still applies while the deciding field is unanswered.
+- **Flags (they block approval without an override, like every flag):** the form filed's sections not complete; a stated capacity more than 1% away from the installed capacity. Checks 2.7–2.12 stay manual.
+- **Updates:** changed answers are listed field by field in "changes to apply" and copied to the registration on approval.
+- **Not done:** no PDF shows the sections yet (the acknowledgement letter and EVAL-01 are unchanged); no figures from the 12-month tables feed the dashboard.
+
 ## 2026-10-24 — Category forms REG-01A to K, part 1: common core and documents (SPEC §1, §2.6, §4.13–§4.15)
 
 The Commission now uses 11 category-specific forms instead of one REG-01 (`registration-forms.json`, `reference/forms/`). Part 2 adds the category-specific technical sections. The rules are in the spec; the choices made here:

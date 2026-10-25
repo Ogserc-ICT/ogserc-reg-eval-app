@@ -1,0 +1,2677 @@
+{
+  "_source": "Category-specific sections of Forms OGSERC/REG-01A to REG-01K (version 2026.1), from the Word forms in reference/forms/. REG-01I's sections are in the app's own-use form. Units are those printed on each form; the app converts kW/kWh to MW/MWh only where it compares capacities.",
+  "forms": {
+    "REG-01A": {
+      "sections": [
+        {
+          "key": "distribution_business",
+          "title": "Distribution business",
+          "fields": [
+            {
+              "key": "type",
+              "label": "Business",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "ogun_only",
+                  "label": "Successor distribution company — Ogun only"
+                },
+                {
+                  "value": "multi_state",
+                  "label": "Multi-State licensee — Ogun State operations"
+                },
+                {
+                  "value": "ogun_successor",
+                  "label": "Ogun successor company (para 7(3)(a))"
+                },
+                {
+                  "value": "also_generation",
+                  "label": "Also operates generation in Ogun State"
+                }
+              ],
+              "derive": {
+                "condition": "multi_state_licensee",
+                "yes": [
+                  "multi_state"
+                ]
+              }
+            },
+            {
+              "key": "business_units",
+              "label": "Business units / service centres in Ogun State",
+              "type": "text"
+            },
+            {
+              "key": "staff",
+              "label": "Number of staff in Ogun State",
+              "type": "integer"
+            }
+          ]
+        },
+        {
+          "key": "network_assets",
+          "title": "Network assets",
+          "fields": [
+            {
+              "key": "network_assets",
+              "label": "Network assets",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "injection_substations",
+                  "label": "Injection substations (33/11 kV)"
+                },
+                {
+                  "key": "feeders_33kv",
+                  "label": "33 kV feeders"
+                },
+                {
+                  "key": "feeders_11kv",
+                  "label": "11 kV feeders"
+                },
+                {
+                  "key": "lv_network",
+                  "label": "Low-voltage network"
+                },
+                {
+                  "key": "transformers",
+                  "label": "Distribution transformers"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "number",
+                  "label": "Number",
+                  "type": "integer"
+                },
+                {
+                  "key": "rating",
+                  "label": "Total rating",
+                  "type": "text"
+                },
+                {
+                  "key": "route_km",
+                  "label": "Route length (km)",
+                  "type": "number",
+                  "unit": "km"
+                }
+              ]
+            },
+            {
+              "key": "bulk_supply_points",
+              "label": "Bulk supply and interface points",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "source",
+                  "label": "Source",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "tcn",
+                      "label": "TCN"
+                    },
+                    {
+                      "value": "embedded",
+                      "label": "Embedded generator"
+                    },
+                    {
+                      "value": "own_plant",
+                      "label": "Own plant"
+                    },
+                    {
+                      "value": "other",
+                      "label": "Other"
+                    }
+                  ]
+                },
+                {
+                  "key": "interface_point",
+                  "label": "Interface point",
+                  "type": "text"
+                },
+                {
+                  "key": "capacity_mw",
+                  "label": "Capacity (MW)",
+                  "type": "number",
+                  "unit": "MW"
+                },
+                {
+                  "key": "agreement",
+                  "label": "Agreement and expiry",
+                  "type": "text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "customers_service",
+          "title": "Customers and service",
+          "fields": [
+            {
+              "key": "customers",
+              "label": "Customers by class",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "residential",
+                  "label": "Residential"
+                },
+                {
+                  "key": "commercial",
+                  "label": "Commercial"
+                },
+                {
+                  "key": "industrial",
+                  "label": "Industrial"
+                },
+                {
+                  "key": "special",
+                  "label": "Special"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "metered",
+                  "label": "Metered",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "unmetered",
+                  "label": "Unmetered",
+                  "type": "integer",
+                  "sum": true
+                }
+              ],
+              "rowTotal": true
+            },
+            {
+              "key": "service_bands",
+              "label": "Service bands",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "band_a",
+                  "label": "Band A"
+                },
+                {
+                  "key": "band_b",
+                  "label": "Band B"
+                },
+                {
+                  "key": "band_c",
+                  "label": "Band C"
+                },
+                {
+                  "key": "band_d",
+                  "label": "Band D"
+                },
+                {
+                  "key": "band_e",
+                  "label": "Band E"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "feeders",
+                  "label": "Feeders",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "customers",
+                  "label": "Customers",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "hours",
+                  "label": "Avg. hours of supply / day",
+                  "type": "number",
+                  "unit": "h"
+                },
+                {
+                  "key": "tariff",
+                  "label": "Tariff (₦/kWh)",
+                  "type": "number",
+                  "unit": "₦/kWh"
+                }
+              ]
+            }
+          ],
+          "note": "Attach the list of the twenty (20) largest customers by consumption (name, class, feeder, MWh in the last 12 months)."
+        },
+        {
+          "key": "commercial",
+          "title": "Commercial data and tariffs — last 12 months",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "received",
+                  "label": "Energy received (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "billed",
+                  "label": "Energy billed (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "customers_billed",
+                  "label": "Customers billed",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            },
+            {
+              "key": "tariff_order",
+              "label": "Tariff order / approval applied (reference and date)",
+              "type": "text"
+            },
+            {
+              "key": "tariff_charged",
+              "label": "Tariff charged (₦/kWh) by class or band",
+              "type": "textarea"
+            }
+          ]
+        },
+        {
+          "key": "multi_state",
+          "title": "Multi-State licensees only (para 7)",
+          "fields": [
+            {
+              "key": "successor_company",
+              "label": "Ogun successor company incorporated? (name, RC no., date)",
+              "type": "text"
+            },
+            {
+              "key": "separate_accounts",
+              "label": "Separate Ogun State accounts kept from the Effective Date?",
+              "type": "choice",
+              "options": [
+                {
+                  "value": "yes",
+                  "label": "Yes"
+                },
+                {
+                  "value": "no",
+                  "label": "No"
+                }
+              ]
+            },
+            {
+              "key": "separate_accounts_date",
+              "label": "If not, expected date",
+              "type": "date",
+              "optional": true
+            },
+            {
+              "key": "ring_fencing",
+              "label": "Ring-fencing plan submitted to OGSERC? (date)",
+              "type": "text"
+            },
+            {
+              "key": "cross_boundary",
+              "label": "Cross-boundary feeders and lines",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "feeder",
+                  "label": "Cross-boundary feeder / line",
+                  "type": "text"
+                },
+                {
+                  "key": "kv",
+                  "label": "Voltage (kV)",
+                  "type": "number",
+                  "unit": "kV"
+                },
+                {
+                  "key": "metering_point",
+                  "label": "Boundary metering point",
+                  "type": "text"
+                },
+                {
+                  "key": "energy",
+                  "label": "Energy across boundary, last 12 months (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                }
+              ]
+            }
+          ],
+          "appliesWhen": "multi_state_licensee"
+        }
+      ]
+    },
+    "REG-01B": {
+      "sections": [
+        {
+          "key": "activities",
+          "title": "Integrated utility activities",
+          "fields": [
+            {
+              "key": "activities",
+              "label": "Activities",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "generation",
+                  "label": "Generation"
+                },
+                {
+                  "value": "distribution",
+                  "label": "Distribution"
+                },
+                {
+                  "value": "supply",
+                  "label": "Supply / retail"
+                },
+                {
+                  "value": "cluster",
+                  "label": "Serving an industrial cluster or estate"
+                }
+              ]
+            },
+            {
+              "key": "total_mw",
+              "label": "Total installed generation capacity (MW)",
+              "type": "number",
+              "capacity": "MW",
+              "unit": "MW"
+            },
+            {
+              "key": "cod",
+              "label": "Commercial operation date",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "key": "generating_plant",
+          "title": "Generating plant",
+          "fields": [
+            {
+              "key": "plant",
+              "label": "Generating plant",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "unit",
+                  "label": "Plant / unit",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "label": "Location (LGA, GPS)",
+                  "type": "text"
+                },
+                {
+                  "key": "fuel",
+                  "label": "Fuel / technology",
+                  "type": "text"
+                },
+                {
+                  "key": "installed",
+                  "label": "Installed MW",
+                  "type": "number",
+                  "unit": "MW",
+                  "sum": true,
+                  "capacity": "MW"
+                },
+                {
+                  "key": "available",
+                  "label": "Available MW",
+                  "type": "number",
+                  "unit": "MW",
+                  "sum": true
+                },
+                {
+                  "key": "commissioned",
+                  "label": "Commissioned",
+                  "type": "text"
+                }
+              ]
+            },
+            {
+              "key": "gas_supplier",
+              "label": "Gas supplier and delivery mode (pipeline / CNG / LNG)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "gas_volume",
+              "label": "Contracted gas volume (MMscf/d) and contract expiry",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "other_fuels",
+              "label": "Other fuels and suppliers",
+              "type": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "distribution_network",
+          "title": "Distribution network",
+          "fields": [
+            {
+              "key": "network_assets",
+              "label": "Network assets",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "injection_substations",
+                  "label": "Injection substations (33/11 kV)"
+                },
+                {
+                  "key": "feeders_33kv",
+                  "label": "33 kV feeders"
+                },
+                {
+                  "key": "feeders_11kv",
+                  "label": "11 kV feeders"
+                },
+                {
+                  "key": "lv_network",
+                  "label": "Low-voltage network"
+                },
+                {
+                  "key": "transformers",
+                  "label": "Distribution transformers"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "number",
+                  "label": "Number",
+                  "type": "integer"
+                },
+                {
+                  "key": "rating",
+                  "label": "Total rating",
+                  "type": "text"
+                },
+                {
+                  "key": "route_km",
+                  "label": "Route length (km)",
+                  "type": "number",
+                  "unit": "km"
+                }
+              ]
+            },
+            {
+              "key": "bulk_supply_points",
+              "label": "Bulk supply and interface points",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "source",
+                  "label": "Source",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "tcn",
+                      "label": "TCN"
+                    },
+                    {
+                      "value": "embedded",
+                      "label": "Embedded generator"
+                    },
+                    {
+                      "value": "own_plant",
+                      "label": "Own plant"
+                    },
+                    {
+                      "value": "other",
+                      "label": "Other"
+                    }
+                  ]
+                },
+                {
+                  "key": "interface_point",
+                  "label": "Interface point",
+                  "type": "text"
+                },
+                {
+                  "key": "capacity_mw",
+                  "label": "Capacity (MW)",
+                  "type": "number",
+                  "unit": "MW"
+                },
+                {
+                  "key": "agreement",
+                  "label": "Agreement and expiry",
+                  "type": "text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "customers_tariffs",
+          "title": "Customers and tariffs",
+          "fields": [
+            {
+              "key": "customers",
+              "label": "Customers by class",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "residential",
+                  "label": "Residential"
+                },
+                {
+                  "key": "commercial",
+                  "label": "Commercial"
+                },
+                {
+                  "key": "industrial",
+                  "label": "Industrial"
+                },
+                {
+                  "key": "special",
+                  "label": "Special"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "metered",
+                  "label": "Metered",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "unmetered",
+                  "label": "Unmetered",
+                  "type": "integer",
+                  "sum": true
+                }
+              ],
+              "rowTotal": true
+            },
+            {
+              "key": "tariff_order",
+              "label": "Tariff order / approval applied (reference and date)",
+              "type": "text"
+            },
+            {
+              "key": "tariff_charged",
+              "label": "Tariff charged (₦/kWh) by class or band",
+              "type": "textarea"
+            }
+          ],
+          "note": "Attach the list of the twenty (20) largest customers by consumption (name, class, feeder, MWh in the last 12 months)."
+        },
+        {
+          "key": "operations",
+          "title": "Operations and commercial data — last 12 months",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "generated",
+                  "label": "Energy generated (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "purchased",
+                  "label": "Energy purchased (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "billed",
+                  "label": "Energy billed (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            }
+          ]
+        }
+      ]
+    },
+    "REG-01C": {
+      "sections": [
+        {
+          "key": "generation_activity",
+          "title": "Generation activity",
+          "fields": [
+            {
+              "key": "activity",
+              "label": "Activity",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "sale_on_grid",
+                  "label": "Generation for sale — on-grid"
+                },
+                {
+                  "value": "sale_embedded",
+                  "label": "Generation for sale — embedded in a distribution network"
+                },
+                {
+                  "value": "sale_off_grid",
+                  "label": "Generation for sale — off-grid"
+                },
+                {
+                  "value": "captive",
+                  "label": "Captive generation — own use only"
+                }
+              ],
+              "derive": {
+                "condition": "generation_for_sale",
+                "yes": [
+                  "sale_on_grid",
+                  "sale_embedded",
+                  "sale_off_grid"
+                ]
+              }
+            },
+            {
+              "key": "total_mw",
+              "label": "Total installed capacity at all sites (MW)",
+              "type": "number",
+              "capacity": "MW",
+              "unit": "MW"
+            },
+            {
+              "key": "cod",
+              "label": "Commercial operation date (or planned date)",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "key": "generating_plant",
+          "title": "Generating plant",
+          "fields": [
+            {
+              "key": "plant",
+              "label": "Generating plant",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "unit",
+                  "label": "Plant / unit",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "label": "Location (LGA, GPS)",
+                  "type": "text"
+                },
+                {
+                  "key": "fuel",
+                  "label": "Fuel / technology",
+                  "type": "text"
+                },
+                {
+                  "key": "installed",
+                  "label": "Installed MW",
+                  "type": "number",
+                  "unit": "MW",
+                  "sum": true,
+                  "capacity": "MW"
+                },
+                {
+                  "key": "available",
+                  "label": "Available MW",
+                  "type": "number",
+                  "unit": "MW",
+                  "sum": true
+                },
+                {
+                  "key": "commissioned",
+                  "label": "Commissioned",
+                  "type": "text"
+                }
+              ]
+            },
+            {
+              "key": "gas_supplier",
+              "label": "Gas supplier and delivery mode (pipeline / CNG / LNG)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "gas_volume",
+              "label": "Contracted gas volume (MMscf/d) and contract expiry",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "other_fuels",
+              "label": "Other fuels and suppliers",
+              "type": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "grid_offtake",
+          "title": "Grid connection and offtake",
+          "fields": [
+            {
+              "key": "connection_point",
+              "label": "Connection point (substation / feeder, kV)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "network",
+              "label": "Network connected to",
+              "type": "choice",
+              "options": [
+                {
+                  "value": "tcn",
+                  "label": "TCN"
+                },
+                {
+                  "value": "disco",
+                  "label": "DisCo"
+                },
+                {
+                  "value": "private",
+                  "label": "Private network"
+                },
+                {
+                  "value": "none",
+                  "label": "None"
+                }
+              ],
+              "derive": {
+                "condition": "grid_connected",
+                "yes": [
+                  "tcn",
+                  "disco",
+                  "private"
+                ]
+              }
+            },
+            {
+              "key": "revenue_meter",
+              "label": "Revenue metering point and meter no.",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "offtakers",
+              "label": "Offtakers (write “Own use” for captive generation)",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "offtaker",
+                  "label": "Offtaker",
+                  "type": "text"
+                },
+                {
+                  "key": "type",
+                  "label": "Type",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "disco",
+                      "label": "DisCo"
+                    },
+                    {
+                      "value": "eligible",
+                      "label": "Eligible customer"
+                    },
+                    {
+                      "value": "trader",
+                      "label": "Trader"
+                    },
+                    {
+                      "value": "own_use",
+                      "label": "Own use"
+                    }
+                  ]
+                },
+                {
+                  "key": "contracted_mw",
+                  "label": "Contracted MW",
+                  "type": "number",
+                  "unit": "MW"
+                },
+                {
+                  "key": "price_basis",
+                  "label": "Tariff or price basis",
+                  "type": "text"
+                },
+                {
+                  "key": "expiry",
+                  "label": "Contract expiry",
+                  "type": "text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "operations",
+          "title": "Operations — last 12 months",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "generated",
+                  "label": "Energy generated (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "sent_out",
+                  "label": "Energy sent out / used (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "availability",
+                  "label": "Availability (%)",
+                  "type": "number",
+                  "unit": "%"
+                },
+                {
+                  "key": "fuel_used",
+                  "label": "Fuel used (MMscf / litres)",
+                  "type": "text"
+                }
+              ],
+              "fixedRows": 12
+            }
+          ]
+        }
+      ]
+    },
+    "REG-01D": {
+      "sections": [
+        {
+          "key": "generation_activity",
+          "title": "Generation activity",
+          "fields": [
+            {
+              "key": "activity",
+              "label": "Activity",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "sale_on_grid",
+                  "label": "Generation for sale — on-grid"
+                },
+                {
+                  "value": "sale_embedded",
+                  "label": "Generation for sale — embedded in a distribution network"
+                },
+                {
+                  "value": "sale_off_grid",
+                  "label": "Generation for sale — off-grid"
+                },
+                {
+                  "value": "captive",
+                  "label": "Captive generation — own use only"
+                }
+              ],
+              "derive": {
+                "condition": "generation_for_sale",
+                "yes": [
+                  "sale_on_grid",
+                  "sale_embedded",
+                  "sale_off_grid"
+                ]
+              }
+            },
+            {
+              "key": "total_mw",
+              "label": "Total installed capacity at all sites (MW)",
+              "type": "number",
+              "capacity": "MW",
+              "unit": "MW"
+            },
+            {
+              "key": "cod",
+              "label": "Commercial operation date (or planned date)",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "key": "generating_plant",
+          "title": "Generating plant",
+          "fields": [
+            {
+              "key": "plant",
+              "label": "Generating plant",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "unit",
+                  "label": "Plant / unit",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "label": "Location (LGA, GPS)",
+                  "type": "text"
+                },
+                {
+                  "key": "fuel",
+                  "label": "Fuel / technology",
+                  "type": "text"
+                },
+                {
+                  "key": "installed",
+                  "label": "Installed MW",
+                  "type": "number",
+                  "unit": "MW",
+                  "sum": true,
+                  "capacity": "MW"
+                },
+                {
+                  "key": "available",
+                  "label": "Available MW",
+                  "type": "number",
+                  "unit": "MW",
+                  "sum": true
+                },
+                {
+                  "key": "commissioned",
+                  "label": "Commissioned",
+                  "type": "text"
+                }
+              ]
+            },
+            {
+              "key": "gas_supplier",
+              "label": "Gas supplier and delivery mode (pipeline / CNG / LNG)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "gas_volume",
+              "label": "Contracted gas volume (MMscf/d) and contract expiry",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "other_fuels",
+              "label": "Other fuels and suppliers",
+              "type": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "grid_offtake",
+          "title": "Grid connection and offtake",
+          "fields": [
+            {
+              "key": "connection_point",
+              "label": "Connection point (substation / feeder, kV)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "network",
+              "label": "Network connected to",
+              "type": "choice",
+              "options": [
+                {
+                  "value": "tcn",
+                  "label": "TCN"
+                },
+                {
+                  "value": "disco",
+                  "label": "DisCo"
+                },
+                {
+                  "value": "private",
+                  "label": "Private network"
+                },
+                {
+                  "value": "none",
+                  "label": "None"
+                }
+              ],
+              "derive": {
+                "condition": "grid_connected",
+                "yes": [
+                  "tcn",
+                  "disco",
+                  "private"
+                ]
+              }
+            },
+            {
+              "key": "revenue_meter",
+              "label": "Revenue metering point and meter no.",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "offtakers",
+              "label": "Offtakers (write “Own use” for captive generation)",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "offtaker",
+                  "label": "Offtaker",
+                  "type": "text"
+                },
+                {
+                  "key": "type",
+                  "label": "Type",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "disco",
+                      "label": "DisCo"
+                    },
+                    {
+                      "value": "eligible",
+                      "label": "Eligible customer"
+                    },
+                    {
+                      "value": "trader",
+                      "label": "Trader"
+                    },
+                    {
+                      "value": "own_use",
+                      "label": "Own use"
+                    }
+                  ]
+                },
+                {
+                  "key": "contracted_mw",
+                  "label": "Contracted MW",
+                  "type": "number",
+                  "unit": "MW"
+                },
+                {
+                  "key": "price_basis",
+                  "label": "Tariff or price basis",
+                  "type": "text"
+                },
+                {
+                  "key": "expiry",
+                  "label": "Contract expiry",
+                  "type": "text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "operations",
+          "title": "Operations — last 12 months",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "generated",
+                  "label": "Energy generated (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "sent_out",
+                  "label": "Energy sent out / used (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "availability",
+                  "label": "Availability (%)",
+                  "type": "number",
+                  "unit": "%"
+                },
+                {
+                  "key": "fuel_used",
+                  "label": "Fuel used (MMscf / litres)",
+                  "type": "text"
+                }
+              ],
+              "fixedRows": 12
+            }
+          ]
+        }
+      ]
+    },
+    "REG-01E": {
+      "sections": [
+        {
+          "key": "minigrid_type",
+          "title": "Mini-grid type",
+          "fields": [
+            {
+              "key": "type",
+              "label": "Type",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "isolated",
+                  "label": "Isolated mini-grid"
+                },
+                {
+                  "value": "interconnected",
+                  "label": "Interconnected mini-grid"
+                },
+                {
+                  "value": "community",
+                  "label": "Community-owned"
+                },
+                {
+                  "value": "grant",
+                  "label": "Grant or subsidy funded (REA / NEP / DARES / other)"
+                }
+              ],
+              "derive": {
+                "condition": "interconnected_minigrid",
+                "yes": [
+                  "interconnected"
+                ]
+              }
+            },
+            {
+              "key": "disco",
+              "label": "DisCo (interconnected only)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "interconnection_date",
+              "label": "Interconnection agreement date (interconnected only)",
+              "type": "date",
+              "optional": true
+            },
+            {
+              "key": "grant",
+              "label": "Grant or subsidy programme, amount and year",
+              "type": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "sites",
+          "title": "Sites",
+          "fields": [
+            {
+              "key": "sites",
+              "label": "Sites (one row per site)",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "site",
+                  "label": "Site / community",
+                  "type": "text"
+                },
+                {
+                  "key": "lga",
+                  "label": "LGA",
+                  "type": "text"
+                },
+                {
+                  "key": "gps",
+                  "label": "GPS coordinates",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "label": "Status",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "operating",
+                      "label": "Operating"
+                    },
+                    {
+                      "value": "building",
+                      "label": "Building"
+                    }
+                  ]
+                },
+                {
+                  "key": "permit",
+                  "label": "Commissioned / permit no.",
+                  "type": "text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "generation_assets",
+          "title": "Generation assets by site",
+          "fields": [
+            {
+              "key": "assets",
+              "label": "Generation assets",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "site",
+                  "label": "Site",
+                  "type": "text"
+                },
+                {
+                  "key": "solar_kwp",
+                  "label": "Solar PV (kWp)",
+                  "type": "number",
+                  "unit": "kWp",
+                  "sum": true
+                },
+                {
+                  "key": "battery_kwh",
+                  "label": "Battery (kWh)",
+                  "type": "number",
+                  "unit": "kWh",
+                  "sum": true
+                },
+                {
+                  "key": "diesel_gas_kw",
+                  "label": "Diesel / gas (kW)",
+                  "type": "number",
+                  "unit": "kW",
+                  "sum": true
+                },
+                {
+                  "key": "other_kw",
+                  "label": "Other (kW)",
+                  "type": "number",
+                  "unit": "kW",
+                  "sum": true
+                },
+                {
+                  "key": "total_kw",
+                  "label": "Total (kW)",
+                  "type": "number",
+                  "unit": "kW",
+                  "sum": true,
+                  "capacity": "kW"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "connections_tariff",
+          "title": "Connections and tariff",
+          "fields": [
+            {
+              "key": "connections",
+              "label": "Connections by site",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "site",
+                  "label": "Site",
+                  "type": "text"
+                },
+                {
+                  "key": "residential",
+                  "label": "Residential",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "commercial",
+                  "label": "Commercial",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "productive",
+                  "label": "Productive use",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "public",
+                  "label": "Public / institutional",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "prepaid_pct",
+                  "label": "Prepaid-metered (%)",
+                  "type": "number",
+                  "unit": "%"
+                }
+              ]
+            },
+            {
+              "key": "tariff_charged",
+              "label": "Tariff charged (₦/kWh) by customer class",
+              "type": "textarea"
+            },
+            {
+              "key": "tariff_approval",
+              "label": "Tariff approval status and reference",
+              "type": "text"
+            },
+            {
+              "key": "fixed_charges",
+              "label": "Fixed or connection charges",
+              "type": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "operations",
+          "title": "Operations — last 12 months (all sites)",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "generated",
+                  "label": "Energy generated (kWh)",
+                  "type": "number",
+                  "unit": "kWh",
+                  "sum": true
+                },
+                {
+                  "key": "sold",
+                  "label": "Energy sold (kWh)",
+                  "type": "number",
+                  "unit": "kWh",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            }
+          ]
+        }
+      ]
+    },
+    "REG-01F": {
+      "sections": [
+        {
+          "key": "distribution",
+          "title": "Part 1 — Distribution (if applicable)",
+          "fields": [
+            {
+              "key": "type",
+              "label": "Distribution licensee",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "iedn",
+                  "label": "Independent electricity distribution network (IEDN)"
+                },
+                {
+                  "value": "other_licensee",
+                  "label": "Other distribution licensee"
+                }
+              ]
+            },
+            {
+              "key": "network_assets",
+              "label": "Network assets",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "injection_substations",
+                  "label": "Injection substations (33/11 kV)"
+                },
+                {
+                  "key": "feeders_33kv",
+                  "label": "33 kV feeders"
+                },
+                {
+                  "key": "feeders_11kv",
+                  "label": "11 kV feeders"
+                },
+                {
+                  "key": "lv_network",
+                  "label": "Low-voltage network"
+                },
+                {
+                  "key": "transformers",
+                  "label": "Distribution transformers"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "number",
+                  "label": "Number",
+                  "type": "integer"
+                },
+                {
+                  "key": "rating",
+                  "label": "Total rating",
+                  "type": "text"
+                },
+                {
+                  "key": "route_km",
+                  "label": "Route length (km)",
+                  "type": "number",
+                  "unit": "km"
+                }
+              ]
+            },
+            {
+              "key": "bulk_supply_points",
+              "label": "Bulk supply and interface points",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "source",
+                  "label": "Source",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "tcn",
+                      "label": "TCN"
+                    },
+                    {
+                      "value": "embedded",
+                      "label": "Embedded generator"
+                    },
+                    {
+                      "value": "own_plant",
+                      "label": "Own plant"
+                    },
+                    {
+                      "value": "other",
+                      "label": "Other"
+                    }
+                  ]
+                },
+                {
+                  "key": "interface_point",
+                  "label": "Interface point",
+                  "type": "text"
+                },
+                {
+                  "key": "capacity_mw",
+                  "label": "Capacity (MW)",
+                  "type": "number",
+                  "unit": "MW"
+                },
+                {
+                  "key": "agreement",
+                  "label": "Agreement and expiry",
+                  "type": "text"
+                }
+              ]
+            },
+            {
+              "key": "customers",
+              "label": "Customers by class",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "residential",
+                  "label": "Residential"
+                },
+                {
+                  "key": "commercial",
+                  "label": "Commercial"
+                },
+                {
+                  "key": "industrial",
+                  "label": "Industrial"
+                },
+                {
+                  "key": "special",
+                  "label": "Special"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "metered",
+                  "label": "Metered",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "unmetered",
+                  "label": "Unmetered",
+                  "type": "integer",
+                  "sum": true
+                }
+              ],
+              "rowTotal": true
+            },
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "received",
+                  "label": "Energy received (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "billed",
+                  "label": "Energy billed (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "customers_billed",
+                  "label": "Customers billed",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            },
+            {
+              "key": "tariff_order",
+              "label": "Tariff order / approval applied (reference and date)",
+              "type": "text"
+            },
+            {
+              "key": "tariff_charged",
+              "label": "Tariff charged (₦/kWh) by class or band",
+              "type": "textarea"
+            }
+          ],
+          "derive": "f_distribution"
+        },
+        {
+          "key": "trading",
+          "title": "Part 2 — Trading and bulk supply (if applicable)",
+          "fields": [
+            {
+              "key": "type",
+              "label": "Trading activity",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "bulk_trading",
+                  "label": "Bulk trading / aggregation"
+                },
+                {
+                  "value": "bulk_supply",
+                  "label": "Bulk supply to DisCos or networks"
+                },
+                {
+                  "value": "eligible",
+                  "label": "Supply to eligible customers"
+                },
+                {
+                  "value": "retail",
+                  "label": "Retail supply"
+                }
+              ]
+            },
+            {
+              "key": "sellers",
+              "label": "Supply sources",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "seller",
+                  "label": "Seller",
+                  "type": "text"
+                },
+                {
+                  "key": "plant",
+                  "label": "Generating plant",
+                  "type": "text"
+                },
+                {
+                  "key": "contracted_mw",
+                  "label": "Contracted MW",
+                  "type": "number",
+                  "unit": "MW"
+                },
+                {
+                  "key": "price_basis",
+                  "label": "Price basis",
+                  "type": "text"
+                },
+                {
+                  "key": "expiry",
+                  "label": "Contract expiry",
+                  "type": "text"
+                }
+              ]
+            },
+            {
+              "key": "buyers",
+              "label": "Buyers and customers",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "buyer",
+                  "label": "Buyer / customer",
+                  "type": "text"
+                },
+                {
+                  "key": "type",
+                  "label": "Type",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "disco",
+                      "label": "DisCo"
+                    },
+                    {
+                      "value": "eligible",
+                      "label": "Eligible"
+                    },
+                    {
+                      "value": "retail",
+                      "label": "Retail"
+                    }
+                  ]
+                },
+                {
+                  "key": "lga",
+                  "label": "LGA",
+                  "type": "text"
+                },
+                {
+                  "key": "contracted",
+                  "label": "Contracted MW or MWh/yr",
+                  "type": "text"
+                },
+                {
+                  "key": "expiry",
+                  "label": "Contract expiry",
+                  "type": "text"
+                }
+              ]
+            },
+            {
+              "key": "wheeling",
+              "label": "Network used for delivery and use-of-system / wheeling agreements",
+              "type": "textarea"
+            },
+            {
+              "key": "credit_support",
+              "label": "Credit support held or provided",
+              "type": "text"
+            },
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "bought",
+                  "label": "Energy bought (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "sold",
+                  "label": "Energy sold (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            }
+          ],
+          "derive": "f_trading"
+        }
+      ]
+    },
+    "REG-01G": {
+      "sections": [
+        {
+          "key": "network_type",
+          "title": "Network type",
+          "fields": [
+            {
+              "key": "type",
+              "label": "Network",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "residential_estate",
+                  "label": "Residential estate network"
+                },
+                {
+                  "value": "industrial_park",
+                  "label": "Industrial park / estate / free zone network"
+                },
+                {
+                  "value": "market",
+                  "label": "Market or commercial complex"
+                },
+                {
+                  "value": "other",
+                  "label": "Other development"
+                }
+              ]
+            },
+            {
+              "key": "other_development",
+              "label": "Other development (describe)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "host",
+              "label": "Host development (name and address)",
+              "type": "text"
+            },
+            {
+              "key": "developer",
+              "label": "Developer / owner of the development",
+              "type": "text"
+            },
+            {
+              "key": "premises",
+              "label": "Number of premises served",
+              "type": "integer"
+            }
+          ]
+        },
+        {
+          "key": "source_of_supply",
+          "title": "Source of supply",
+          "fields": [
+            {
+              "key": "source",
+              "label": "Source",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "disco",
+                  "label": "DisCo bulk supply"
+                },
+                {
+                  "value": "own_generation",
+                  "label": "Own generation"
+                }
+              ],
+              "derive": {
+                "condition": "g_disco_bulk_supply",
+                "yes": [
+                  "disco"
+                ]
+              }
+            },
+            {
+              "key": "disco",
+              "label": "DisCo",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "bulk_meter",
+              "label": "Bulk meter no. and tariff band",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "bulk_agreement",
+              "label": "Bulk supply agreement (parties, date)",
+              "type": "text",
+              "optional": true
+            },
+            {
+              "key": "own_plant",
+              "label": "Own generating units (own generation only)",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "unit",
+                  "label": "Own generating unit",
+                  "type": "text"
+                },
+                {
+                  "key": "fuel",
+                  "label": "Fuel / technology",
+                  "type": "text"
+                },
+                {
+                  "key": "installed",
+                  "label": "Installed kW / MW",
+                  "type": "text"
+                },
+                {
+                  "key": "available",
+                  "label": "Available kW / MW",
+                  "type": "text"
+                },
+                {
+                  "key": "commissioned",
+                  "label": "Commissioned",
+                  "type": "text"
+                }
+              ],
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "network_assets",
+          "title": "Network assets",
+          "fields": [
+            {
+              "key": "network_assets",
+              "label": "Network assets",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "transformers",
+                  "label": "Substations / transformers"
+                },
+                {
+                  "key": "lines_hv",
+                  "label": "11 kV / 33 kV lines"
+                },
+                {
+                  "key": "lines_lv",
+                  "label": "Low-voltage lines"
+                },
+                {
+                  "key": "feeder_pillars",
+                  "label": "Feeder pillars"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "number",
+                  "label": "Number",
+                  "type": "integer"
+                },
+                {
+                  "key": "rating_kva",
+                  "label": "Total rating (kVA)",
+                  "type": "number",
+                  "unit": "kVA"
+                },
+                {
+                  "key": "route_km",
+                  "label": "Route length (km)",
+                  "type": "number",
+                  "unit": "km"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "customers_tariff",
+          "title": "Customers and tariff",
+          "fields": [
+            {
+              "key": "customers",
+              "label": "Customers by class",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "residential",
+                  "label": "Residential"
+                },
+                {
+                  "key": "commercial",
+                  "label": "Commercial"
+                },
+                {
+                  "key": "industrial",
+                  "label": "Industrial"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "metered",
+                  "label": "Metered",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "unmetered",
+                  "label": "Unmetered",
+                  "type": "integer",
+                  "sum": true
+                }
+              ],
+              "rowTotal": true
+            },
+            {
+              "key": "tariff_charged",
+              "label": "Tariff charged (₦/kWh) and how it is set",
+              "type": "textarea"
+            },
+            {
+              "key": "service_charges",
+              "label": "Service or maintenance charges",
+              "type": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "commercial",
+          "title": "Commercial data — last 12 months",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "bought",
+                  "label": "Energy bought / generated (kWh)",
+                  "type": "number",
+                  "unit": "kWh",
+                  "sum": true
+                },
+                {
+                  "key": "billed",
+                  "label": "Energy billed (kWh)",
+                  "type": "number",
+                  "unit": "kWh",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            }
+          ]
+        }
+      ]
+    },
+    "REG-01H": {
+      "sections": [
+        {
+          "key": "services",
+          "title": "Services provided",
+          "fields": [
+            {
+              "key": "services",
+              "label": "Services",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "meter_supply",
+                  "label": "Meter supply (meter asset provider)"
+                },
+                {
+                  "value": "installation",
+                  "label": "Installation and commissioning"
+                },
+                {
+                  "value": "maintenance",
+                  "label": "Maintenance and replacement"
+                },
+                {
+                  "value": "data",
+                  "label": "Meter data, vending or token services"
+                }
+              ]
+            },
+            {
+              "key": "nemsa",
+              "label": "NEMSA certification / accreditation no. and expiry",
+              "type": "text"
+            },
+            {
+              "key": "map_contracts",
+              "label": "Framework or MAP contracts with distribution licensees",
+              "type": "textarea"
+            }
+          ]
+        },
+        {
+          "key": "meter_types",
+          "title": "Meter types",
+          "fields": [
+            {
+              "key": "meter_types",
+              "label": "Meter types",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "type",
+                  "label": "Meter type",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "1ph",
+                      "label": "1-phase"
+                    },
+                    {
+                      "value": "3ph",
+                      "label": "3-phase"
+                    },
+                    {
+                      "value": "md",
+                      "label": "MD"
+                    },
+                    {
+                      "value": "ct",
+                      "label": "CT"
+                    }
+                  ]
+                },
+                {
+                  "key": "model",
+                  "label": "Brand and model",
+                  "type": "text"
+                },
+                {
+                  "key": "type_test",
+                  "label": "Type-test certificate no.",
+                  "type": "text"
+                },
+                {
+                  "key": "origin",
+                  "label": "Origin",
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "local",
+                      "label": "Local"
+                    },
+                    {
+                      "value": "imported",
+                      "label": "Imported"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "installations",
+          "title": "Installations in Ogun State",
+          "fields": [
+            {
+              "key": "installations",
+              "label": "Installations by client and LGA",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "client",
+                  "label": "Client (DisCo / mini-grid / private network)",
+                  "type": "text"
+                },
+                {
+                  "key": "lga",
+                  "label": "LGA",
+                  "type": "text"
+                },
+                {
+                  "key": "last_12",
+                  "label": "Meters installed, last 12 months",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "to_date",
+                  "label": "Total meters installed to date",
+                  "type": "integer",
+                  "sum": true
+                }
+              ]
+            },
+            {
+              "key": "workshop",
+              "label": "Workshop / warehouse address in Ogun State",
+              "type": "text"
+            },
+            {
+              "key": "installers",
+              "label": "Number of certified installers",
+              "type": "integer"
+            },
+            {
+              "key": "faults",
+              "label": "Meter faults and replacements, last 12 months",
+              "type": "integer"
+            },
+            {
+              "key": "complaints",
+              "label": "Customer complaints received and resolved, last 12 months",
+              "type": "text"
+            }
+          ]
+        }
+      ]
+    },
+    "REG-01J": {
+      "sections": [
+        {
+          "key": "franchise",
+          "title": "Franchise arrangement",
+          "fields": [
+            {
+              "key": "role",
+              "label": "Role and scope",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "franchisee",
+                  "label": "Franchisee"
+                },
+                {
+                  "value": "sub_franchisee",
+                  "label": "Sub-franchisee"
+                },
+                {
+                  "value": "distribution_supply",
+                  "label": "Distribution and supply"
+                },
+                {
+                  "value": "supply_only",
+                  "label": "Supply / revenue collection only"
+                }
+              ],
+              "derive": {
+                "condition": "sub_franchise",
+                "yes": [
+                  "sub_franchisee"
+                ]
+              }
+            },
+            {
+              "key": "franchisor",
+              "label": "Franchisor (distribution licensee) and head franchisee, if sub-franchise",
+              "type": "text"
+            },
+            {
+              "key": "agreement",
+              "label": "Agreement date, term and expiry",
+              "type": "text"
+            },
+            {
+              "key": "territory",
+              "label": "Franchise territory: feeders, business units or communities",
+              "type": "textarea"
+            },
+            {
+              "key": "investment",
+              "label": "Investment obligations under the agreement",
+              "type": "textarea",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "network_assets",
+          "title": "Network assets in the territory",
+          "fields": [
+            {
+              "key": "network_assets",
+              "label": "Network assets",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "feeders",
+                  "label": "11 kV / 33 kV feeders"
+                },
+                {
+                  "key": "transformers",
+                  "label": "Distribution transformers"
+                },
+                {
+                  "key": "lv_network",
+                  "label": "Low-voltage network"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "number",
+                  "label": "Number",
+                  "type": "integer"
+                },
+                {
+                  "key": "rating",
+                  "label": "Total rating",
+                  "type": "text"
+                },
+                {
+                  "key": "route_km",
+                  "label": "Route length (km)",
+                  "type": "number",
+                  "unit": "km"
+                }
+              ]
+            },
+            {
+              "key": "owned_assets",
+              "label": "Assets owned by franchisee (number)",
+              "type": "integer"
+            }
+          ]
+        },
+        {
+          "key": "customers_tariff",
+          "title": "Customers and tariff",
+          "fields": [
+            {
+              "key": "customers",
+              "label": "Customers by class",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "residential",
+                  "label": "Residential"
+                },
+                {
+                  "key": "commercial",
+                  "label": "Commercial"
+                },
+                {
+                  "key": "industrial",
+                  "label": "Industrial"
+                },
+                {
+                  "key": "special",
+                  "label": "Special"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "metered",
+                  "label": "Metered",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "unmetered",
+                  "label": "Unmetered",
+                  "type": "integer",
+                  "sum": true
+                }
+              ],
+              "rowTotal": true
+            },
+            {
+              "key": "tariff",
+              "label": "Tariff applied (franchisor's approved tariff or other)",
+              "type": "text"
+            },
+            {
+              "key": "revenue_sharing",
+              "label": "Revenue-sharing or fee arrangement with franchisor",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "key": "commercial",
+          "title": "Commercial data — last 12 months",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "received",
+                  "label": "Energy received (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "billed",
+                  "label": "Energy billed (MWh)",
+                  "type": "number",
+                  "unit": "MWh",
+                  "sum": true
+                },
+                {
+                  "key": "customers_billed",
+                  "label": "Customers billed",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            }
+          ]
+        }
+      ]
+    },
+    "REG-01K": {
+      "sections": [
+        {
+          "key": "activity",
+          "title": "Activity",
+          "fields": [
+            {
+              "key": "activity",
+              "label": "Activity",
+              "type": "checks",
+              "options": [
+                {
+                  "value": "generation",
+                  "label": "Generation for sale below 1 MW"
+                },
+                {
+                  "value": "supply",
+                  "label": "Supply / retail below 1 MW"
+                },
+                {
+                  "value": "other",
+                  "label": "Other licensed activity"
+                },
+                {
+                  "value": "combination",
+                  "label": "Combination (describe below)"
+                }
+              ]
+            },
+            {
+              "key": "description",
+              "label": "Description of the activity and who is supplied",
+              "type": "textarea"
+            },
+            {
+              "key": "started",
+              "label": "Date started (or planned)",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "key": "assets",
+          "title": "Assets",
+          "fields": [
+            {
+              "key": "assets",
+              "label": "Assets",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "unit",
+                  "label": "Asset / unit",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "label": "Location (LGA, GPS)",
+                  "type": "text"
+                },
+                {
+                  "key": "technology",
+                  "label": "Technology",
+                  "type": "text"
+                },
+                {
+                  "key": "capacity_kw",
+                  "label": "Capacity (kW)",
+                  "type": "number",
+                  "unit": "kW",
+                  "sum": true,
+                  "capacity": "kW"
+                },
+                {
+                  "key": "commissioned",
+                  "label": "Commissioned",
+                  "type": "text"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "customers_tariff",
+          "title": "Customers and tariff",
+          "fields": [
+            {
+              "key": "customers",
+              "label": "Customers by class",
+              "type": "grid",
+              "rows": [
+                {
+                  "key": "residential",
+                  "label": "Residential"
+                },
+                {
+                  "key": "commercial",
+                  "label": "Commercial"
+                },
+                {
+                  "key": "industrial",
+                  "label": "Industrial"
+                }
+              ],
+              "columns": [
+                {
+                  "key": "metered",
+                  "label": "Metered",
+                  "type": "integer",
+                  "sum": true
+                },
+                {
+                  "key": "unmetered",
+                  "label": "Unmetered",
+                  "type": "integer",
+                  "sum": true
+                }
+              ],
+              "rowTotal": true
+            },
+            {
+              "key": "tariff",
+              "label": "Tariff or price charged and how it is set",
+              "type": "textarea"
+            }
+          ]
+        },
+        {
+          "key": "operations",
+          "title": "Operations — last 12 months",
+          "fields": [
+            {
+              "key": "last_12_months",
+              "label": "Last 12 months",
+              "type": "table",
+              "columns": [
+                {
+                  "key": "month",
+                  "label": "Month / year",
+                  "type": "text"
+                },
+                {
+                  "key": "generated",
+                  "label": "Energy generated / bought (kWh)",
+                  "type": "number",
+                  "unit": "kWh",
+                  "sum": true
+                },
+                {
+                  "key": "sold",
+                  "label": "Energy sold (kWh)",
+                  "type": "number",
+                  "unit": "kWh",
+                  "sum": true
+                },
+                {
+                  "key": "amount_billed",
+                  "label": "Amount billed (₦)",
+                  "type": "money",
+                  "sum": true
+                },
+                {
+                  "key": "amount_collected",
+                  "label": "Amount collected (₦)",
+                  "type": "money",
+                  "sum": true
+                }
+              ],
+              "fixedRows": 12
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

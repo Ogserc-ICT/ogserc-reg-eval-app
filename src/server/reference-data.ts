@@ -1,8 +1,13 @@
 import type { Settings as SettingsRow } from "@prisma/client";
+import technicalFile from "../../technical-sections.json";
 import type { ConditionKey, RegistrationFormDef } from "@/domain/forms";
+import type { TechnicalDefs } from "@/domain/technical";
 import type { ReferenceData, Settings } from "@/domain/reference";
 import type { IsoDate } from "@/domain/types";
 import type { Db, Tx } from "./types";
+
+/** Category-specific sections of REG-01A to K: fixed definitions read from the file (not edited in the app). */
+export const TECHNICAL_DEFS = technicalFile.forms as unknown as TechnicalDefs;
 
 /** Drop-down lists stored in LookupValue, keyed by their seed-data.json name. */
 export const LISTS = [
@@ -152,6 +157,7 @@ export async function loadReferenceData(db: Db | Tx): Promise<ReferenceData> {
         requiredWhen: d.requiredWhen as ConditionKey | null,
       })),
     })),
+    technical: TECHNICAL_DEFS,
     evaluationChecks: checks.map((c) => ({ id: c.id, stage: c.stage, text: c.text })),
   };
 }

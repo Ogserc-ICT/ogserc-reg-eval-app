@@ -49,6 +49,8 @@ export const SUBMISSION_FIELDS = [
   "fTrading",
   "gDiscoBulkSupply",
   "subFranchise",
+  // Category-specific sections, as JSON.
+  "technicalData",
   "operatingOnEffectiveDate",
   "plannedStartDate",
   "categoryOverride",

@@ -1,10 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { formatDate, yearOf } from "@/domain/dates";
 import { describeChanges, filingChanges, type FieldChange } from "@/domain/filing";
+import { technicalChanges, type TechnicalData } from "@/domain/technical";
 import { FILING_LABELS } from "@/domain/types";
 import { writeAudit } from "./audit";
 import { NotFoundError } from "./errors";
-import { toIsoDate } from "./reference-data";
+import { TECHNICAL_DEFS, toIsoDate } from "./reference-data";
 import { childrenInclude, filingValues } from "./submission-text";
 import type { Actor, Tx, Db } from "./types";
 
@@ -63,7 +64,15 @@ export async function pendingFilingChanges(db: Db | Tx, filingId: string) {
   return {
     filing,
     registered,
-    changes: filingChanges(filingValues(registered), filingValues(filing)),
+    changes: [
+      ...filingChanges(filingValues(registered), filingValues(filing)),
+      // The category-specific sections, field by field.
+      ...technicalChanges(
+        TECHNICAL_DEFS,
+        registered.technicalData as unknown as TechnicalData,
+        filing.technicalData as unknown as TechnicalData,
+      ),
+    ],
   };
 }
 
@@ -83,6 +92,9 @@ export async function applyFiling(tx: Tx, actor: Actor, filingId: string, today:
   const copy = data as Record<string, unknown>;
   for (const key of SCALAR_FIELDS) if (changed.has(key)) copy[key] = filing[key];
   if (changed.has("signatories")) for (const key of SIGNATORY_COLUMNS) copy[key] = filing[key];
+  if (changes.some((c) => c.key.startsWith("technical:"))) {
+    copy.technicalData = filing.technicalData;
+  }
   const reissue = changes.some((c) => c.certificate);
   if (reissue) data.certificateNeedsReissue = true;
   if (Object.keys(data).length) await tx.submission.update({ where: { id }, data });

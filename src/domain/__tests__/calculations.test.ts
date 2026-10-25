@@ -412,15 +412,16 @@ describe("next action", () => {
   });
 
   it("lists what is outstanding (REG-01E: 13 items, evidence of payment among them)", () => {
+    // An isolated mini-grid: the interconnection agreement is N/A, so 12 are outstanding.
     expect(act({})).toBe(
-      "Obtain 13 outstanding document(s) and collect ₦250,000 – or issue a deficiency notice",
+      "Obtain 12 outstanding document(s) and collect ₦250,000 – or issue a deficiency notice",
     );
     // Evidence of payment stays outstanding until Finance confirms the fee.
     expect(act({ documents: allDocs("Y") })).toBe(
       "Obtain 1 outstanding document(s) and collect ₦250,000 – or issue a deficiency notice",
     );
     expect(act({}, ED, 250_000)).toBe(
-      "Obtain 12 outstanding document(s) – or issue a deficiency notice",
+      "Obtain 11 outstanding document(s) – or issue a deficiency notice",
     );
   });
 

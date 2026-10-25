@@ -20,9 +20,14 @@ import {
   refuseSubmission,
   saveChecks,
 } from "@/server/workflow";
-import { asWorkflow, makeUser, resetDb, testDb } from "./helpers";
+import { asWorkflow, makeUser, resetDb, testDb, technicalAnswers } from "./helpers";
 
 const db = testDb();
+
+/** REG-01E's category-specific sections answered, at each capacity these tests use. */
+const TECHNICAL: Record<string, string> = {
+  "2.5": technicalAnswers("REG-01E", 2.5),
+};
 afterAll(() => db.$disconnect());
 
 const TODAY = "2026-10-22";
@@ -58,6 +63,7 @@ const form = (o: Record<string, string> = {}) => ({
   primaryActivityCode: "MGD",
   filingType: "NEW",
   formFiled: "REG-01E",
+  technicalData: TECHNICAL["2.5"],
   installedCapacityMw: "2.5",
   customers: "",
   licenceStatus: "NERC registration/permit (mini-grid/captive)",

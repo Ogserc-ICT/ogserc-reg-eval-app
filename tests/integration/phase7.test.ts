@@ -9,9 +9,14 @@ import { createSubmission } from "@/server/intake";
 import { exportRegister } from "@/server/register-export";
 import type { Actor } from "@/server/types";
 import { commitImport, previewImport, uploadWorkbook } from "@/server/workbook-import";
-import { makeUser, resetDb, testDb } from "./helpers";
+import { makeUser, resetDb, testDb, technicalAnswers } from "./helpers";
 
 const db = testDb();
+
+/** REG-01E's category-specific sections answered, at each capacity these tests use. */
+const TECHNICAL: Record<string, string> = {
+  "1": technicalAnswers("REG-01E", 1),
+};
 afterAll(() => db.$disconnect());
 
 const WORKBOOK = "reference/OGSERC_Registration_and_Evaluation_System.xlsm";
@@ -102,6 +107,7 @@ describe("workbook import", () => {
       primaryActivityCode: "MGD",
       filingType: "NEW",
       formFiled: "REG-01E",
+      technicalData: TECHNICAL["1"],
       installedCapacityMw: "1",
       customers: "",
       licenceStatus: "NERC registration/permit (mini-grid/captive)",
