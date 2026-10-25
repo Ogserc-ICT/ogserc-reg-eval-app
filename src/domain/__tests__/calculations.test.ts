@@ -10,7 +10,8 @@ import {
   todayInLagos,
 } from "../dates";
 import { licenceNeedsRenewal } from "../deadlines";
-import { summariseDocuments } from "../documents";
+import { effectiveDocuments, summariseDocuments } from "../documents";
+import { NO_CONDITIONS, findForm } from "../forms";
 import { feeSummary, type FeeInput } from "../fees";
 import { feeTermsFor } from "../pricing";
 import type { Policy } from "../reference";
@@ -43,9 +44,9 @@ import {
 } from "./helpers";
 
 describe("seed reference data", () => {
-  it("has 13 Schedule 2 documents and 55 + 7 evaluation checks", () => {
-    expect(ref.schedule2Documents).toHaveLength(13);
-    expect(ref.evaluationChecks).toHaveLength(62);
+  it("has the 11 forms REG-01A to K and 56 + 7 evaluation checks", () => {
+    expect(ref.forms.map((f) => f.form)).toEqual("ABCDEFGHIJK".split("").map((c) => `REG-01${c}`));
+    expect(ref.evaluationChecks).toHaveLength(63);
     expect(ref.evaluationChecks.filter((c) => c.id.startsWith("9."))).toHaveLength(7);
   });
 
@@ -106,24 +107,26 @@ describe("category", () => {
   const gen = findActivity(activity("GEN"), ref);
 
   it("uses tier boundaries at exactly 1 and 10 MW", () => {
-    expect(categoryForActivity(gen, 0.999)).toBe("K");
-    expect(categoryForActivity(gen, 1)).toBe("D");
-    expect(categoryForActivity(gen, 9.999)).toBe("D");
-    expect(categoryForActivity(gen, 10)).toBe("C");
-    expect(categoryForActivity(gen, null)).toBe("K");
+    expect(categoryForActivity(gen, 0.999, settings.policy)).toBe("K");
+    expect(categoryForActivity(gen, 1, settings.policy)).toBe("D");
+    expect(categoryForActivity(gen, 9.999, settings.policy)).toBe("D");
+    expect(categoryForActivity(gen, 10, settings.policy)).toBe("C");
+    expect(categoryForActivity(gen, null, settings.policy)).toBe("K");
   });
 
   it("is empty with no or unknown primary activity, even with a secondary", () => {
     expect(
       categoryAuto(
-        { primaryActivity: null, secondaryActivity: activity("SDC"), installedCapacityMw: 5 },
+        { primaryActivity: null, otherActivities: [activity("SDC")], installedCapacityMw: 5 },
         ref,
+        settings.policy,
       ),
     ).toBeNull();
     expect(
       categoryAuto(
-        { primaryActivity: "Nonsense", secondaryActivity: null, installedCapacityMw: 5 },
+        { primaryActivity: "Nonsense", otherActivities: [], installedCapacityMw: 5 },
         ref,
+        settings.policy,
       ),
     ).toBeNull();
   });
@@ -133,10 +136,11 @@ describe("category", () => {
       categoryAuto(
         {
           primaryActivity: activity("EST"),
-          secondaryActivity: activity("INT"),
+          otherActivities: [activity("INT")],
           installedCapacityMw: 0,
         },
         ref,
+        settings.policy,
       ),
     ).toBe("B");
   });
@@ -147,20 +151,22 @@ describe("category", () => {
       categoryAuto(
         {
           primaryActivity: activity("MGD"),
-          secondaryActivity: activity("MET"),
+          otherActivities: [activity("MET")],
           installedCapacityMw: 2,
         },
         ref,
+        settings.policy,
       ),
     ).toBe("E");
     expect(
       categoryAuto(
         {
           primaryActivity: activity("MET"),
-          secondaryActivity: activity("MGD"),
+          otherActivities: [activity("MGD")],
           installedCapacityMw: 2,
         },
         ref,
+        settings.policy,
       ),
     ).toBe("H");
   });
@@ -170,10 +176,11 @@ describe("category", () => {
       categoryAuto(
         {
           primaryActivity: activity("EST"),
-          secondaryActivity: activity("GEN"),
+          otherActivities: [activity("GEN")],
           installedCapacityMw: 5,
         },
         ref,
+        settings.policy,
       ),
     ).toBe("G");
   });
@@ -314,19 +321,26 @@ describe("fees and payments", () => {
 });
 
 describe("documents and completeness", () => {
-  it("counts outstanding and pending, and lists items", () => {
-    const docs = allDocs("Y");
-    docs[0] = "N";
-    docs[1] = null;
-    docs[12] = "N/A";
-    const s = summariseDocuments(docs, ref.schedule2Documents);
+  const e = findForm("REG-01E", ref.forms)!;
+  const list = e.documents.map((d) => ({ ...d, form: e.form }));
+
+  it("counts outstanding and pending, and lists items by their text", () => {
+    const docs = {
+      ...allDocs("Y"),
+      incorporation: "N",
+      constitution: null,
+      community_consent: "N/A",
+    } as const;
+    const s = summariseDocuments(effectiveDocuments(list, docs, NO_CONDITIONS, "Y"));
     expect(s).toMatchObject({ outstanding: 1, pending: 1, documentsComplete: false });
-    expect(s.outstandingList).toEqual([ref.schedule2Documents[0], ref.schedule2Documents[1]]);
+    expect(s.outstandingList).toEqual([e.documents[0]!.text, e.documents[1]!.text]);
+    // 13 items: 1 N, 1 blank, 1 N/A, 10 received (evidence of payment included).
     expect(s.receivedList).toHaveLength(10);
   });
 
   it("treats N/A as complete", () => {
-    expect(summariseDocuments(allDocs("N/A"), ref.schedule2Documents).documentsComplete).toBe(true);
+    const s = summariseDocuments(effectiveDocuments(list, allDocs("N/A"), NO_CONDITIONS, "N/A"));
+    expect(s.documentsComplete).toBe(true);
   });
 
   it("does not let an unpaid late charge block completeness by default (§2.7)", () => {
@@ -397,15 +411,16 @@ describe("next action", () => {
     expect(act(sub, addDays(ED, 15))).toBe("Response overdue – lapse the submission (para 13(2))");
   });
 
-  it("lists what is outstanding", () => {
+  it("lists what is outstanding (REG-01E: 13 items, evidence of payment among them)", () => {
     expect(act({})).toBe(
       "Obtain 13 outstanding document(s) and collect ₦250,000 – or issue a deficiency notice",
     );
+    // Evidence of payment stays outstanding until Finance confirms the fee.
     expect(act({ documents: allDocs("Y") })).toBe(
-      "Collect ₦250,000 – or issue a deficiency notice",
+      "Obtain 1 outstanding document(s) and collect ₦250,000 – or issue a deficiency notice",
     );
     expect(act({}, ED, 250_000)).toBe(
-      "Obtain 13 outstanding document(s) – or issue a deficiency notice",
+      "Obtain 12 outstanding document(s) – or issue a deficiency notice",
     );
   });
 

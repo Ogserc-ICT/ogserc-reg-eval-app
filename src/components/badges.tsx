@@ -14,6 +14,7 @@ const STATUS_STYLE: Record<Status, string> = {
   Lapsed: "bg-gray-200 text-gray-700",
   Refused: "bg-red-100 text-red-900",
   Cancelled: "bg-gray-200 text-gray-700",
+  "Changes Applied": "bg-teal-100 text-teal-900",
 };
 
 export function StatusBadge({ status }: { status: Status }) {

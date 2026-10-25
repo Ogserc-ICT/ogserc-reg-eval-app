@@ -1,13 +1,40 @@
+import { certificateDateParts } from "./dates";
 import { existingOperatorDeadline } from "./deadlines";
+import {
+  effectiveDocuments,
+  paymentEvidenceValue,
+  summariseDocuments,
+  type DocumentSummary,
+} from "./documents";
 import { paymentsFor, type PaymentStatus } from "./fees";
+import { NO_CONDITIONS, OWN_USE_FORM, findForm } from "./forms";
 import { formatNaira } from "./money";
 import type { DataFlag } from "./flags";
+import { certificateSerial, formatRegistrationNo } from "./numbers";
 import { findFeeRow, type ReferenceData, type Settings } from "./reference";
-import type { IsoDate, Kobo, PaymentInput } from "./types";
+import type { CheckValue, IsoDate, Kobo, PaymentInput } from "./types";
+import { separationOfDutiesViolations, signatoriesMissing } from "./workflow";
 
 /** Para 3(3)(c): own-use generation of 1 MW or more registers as captive generation. */
 export const OWN_USE_MAX_KW = 1000;
 export const OWN_USE_CATEGORY = "I";
+/** Activity code in an own-use registration number (REG-01I covers captive generation, CPT). */
+export const OWN_USE_ACTIVITY_CODE = "CPT";
+
+/** A generator at the site (REG-01I Section C). */
+export interface OwnUseUnitInput {
+  makeModel: string | null;
+  capacityKw: number;
+  fuel: string | null;
+  avgMonthlyMwh: number | null;
+}
+
+/** Installed capacity of the site: the sum of its units; null when no unit is recorded. */
+export function totalCapacityKw(units: readonly OwnUseUnitInput[]): number | null {
+  if (!units.length) return null;
+  // Sum in thousandths of a kW (the column's precision), so 0.1 + 0.2 stays 0.3.
+  return units.reduce((sum, u) => sum + Math.round(u.capacityKw * 1000), 0) / 1000;
+}
 
 export type OwnUseEligibility = "Not required" | "Notification required" | "Register as operator";
 
@@ -68,10 +95,16 @@ export interface OwnUseInput {
   name: string | null;
   dateFiled: IsoDate | null;
   cacNo: string | null;
+  siteAddress: string | null;
   lga: string | null;
-  installedCapacityKw: number | null;
+  units: OwnUseUnitInput[];
+  /** Stored checklist values by document key (REG-01I list). */
+  documents: Record<string, CheckValue>;
   /** Saved snapshot; null for an unsaved notification (priced live). */
   pricing: OwnUsePricing | null;
+  /** Set when registered with a certificate (only when the "own-use certificate" setting is on). */
+  registrationNo: string | null;
+  certificateIssueDate: IsoDate | null;
 }
 
 export interface OwnUseFlagContext {
@@ -84,6 +117,8 @@ export interface OwnUseFlagContext {
 }
 
 export interface OwnUseAssessment {
+  /** Sum of the generator units. */
+  installedCapacityKw: number | null;
   eligibility: OwnUseEligibility | null;
   /** From the snapshot once saved. */
   feeDue: Kobo;
@@ -93,14 +128,29 @@ export interface OwnUseAssessment {
   filedLate: boolean;
   pricingCurrent: OwnUsePricing | null;
   pricingChanges: string[];
+  /** REG-01I Schedule 2 list. */
+  documents: DocumentSummary;
   flags: DataFlag[];
 }
 
-const norm = (s: string | null) => (s ?? "").trim().toLowerCase();
+const norm = (s: string | null) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+/** One notification per site: the same CAC number at the same site address. */
+export function sameSite(
+  a: Pick<OwnUseInput, "cacNo" | "siteAddress">,
+  b: Pick<OwnUseInput, "cacNo" | "siteAddress">,
+): boolean {
+  return (
+    !!norm(a.cacNo) &&
+    !!norm(a.siteAddress) &&
+    norm(a.cacNo) === norm(b.cacNo) &&
+    norm(a.siteAddress) === norm(b.siteAddress)
+  );
+}
 
 /** §4.3: everything shown for an own-use notification. */
 export function assessOwnUse(oun: OwnUseInput, c: OwnUseFlagContext): OwnUseAssessment {
-  const kw = oun.installedCapacityKw;
+  const kw = totalCapacityKw(oun.units);
   const current = kw === null ? null : priceOwnUse(kw, c.ref, c.settings);
   const pricing = oun.pricing ?? current;
   const thresholdSettings = pricing
@@ -126,7 +176,7 @@ export function assessOwnUse(oun: OwnUseInput, c: OwnUseFlagContext): OwnUseAsse
       ["name", oun.name],
       ["date filed", oun.dateFiled],
       ["LGA", oun.lga],
-      ["installed capacity", oun.installedCapacityKw],
+      ["generator units", kw],
     ] as const
   )
     .filter(([, v]) => v === null || v === "")
@@ -137,13 +187,14 @@ export function assessOwnUse(oun: OwnUseInput, c: OwnUseFlagContext): OwnUseAsse
       message: `Missing required field: ${missing.join(", ")}`,
     });
   }
+  // One notification per site; the same registrant may notify several sites.
+  if (c.otherNotifications.some((o) => o.id !== oun.id && sameSite(o, oun))) {
+    flags.push({
+      code: "DUPLICATE_SITE",
+      message: "Another own-use notification has the same CAC number and site address",
+    });
+  }
   if (oun.cacNo?.trim()) {
-    if (c.otherNotifications.some((o) => o.id !== oun.id && norm(o.cacNo) === norm(oun.cacNo))) {
-      flags.push({
-        code: "DUPLICATE_CAC",
-        message: "Duplicate CAC number among own-use notifications",
-      });
-    }
     if (c.registerCacNos.some((cac) => norm(cac) === norm(oun.cacNo))) {
       flags.push({ code: "CAC_ON_REGISTER", message: "CAC number is also on the Register" });
     }
@@ -156,7 +207,18 @@ export function assessOwnUse(oun: OwnUseInput, c: OwnUseFlagContext): OwnUseAsse
     });
   }
 
+  const form = findForm(OWN_USE_FORM, c.ref.forms);
+  const documents = summariseDocuments(
+    effectiveDocuments(
+      (form?.documents ?? []).map((d) => ({ ...d, form: OWN_USE_FORM })),
+      oun.documents,
+      NO_CONDITIONS,
+      paymentEvidenceValue({ netFee: feeDue, amountPaid }),
+    ),
+  );
+
   return {
+    installedCapacityKw: kw,
     eligibility: kw === null ? null : ownUseEligibility(kw, thresholdSettings),
     feeDue,
     amountPaid,
@@ -166,7 +228,107 @@ export function assessOwnUse(oun: OwnUseInput, c: OwnUseFlagContext): OwnUseAsse
     filedLate: !!oun.dateFiled && ownUseFiledLate(oun.dateFiled, c.settings),
     pricingCurrent: current,
     pricingChanges,
+    documents,
     flags,
+  };
+}
+
+// --- Registration with a certificate (setting "own-use certificate", default off) ---------------
+
+export interface OwnUseRegistrationInput {
+  oun: OwnUseInput;
+  assessment: OwnUseAssessment;
+  settings: Settings;
+  createdById: string;
+  actorId: string;
+  /** Approver's written reason for registering despite flags (when flags do not block outright). */
+  flagOverrideReason: string | null;
+}
+
+/** Every reason an own-use notification cannot be registered now. */
+export function ownUseRegistrationBlockers(input: OwnUseRegistrationInput): string[] {
+  const { oun, assessment: a, settings } = input;
+  const reasons: string[] = [];
+  if (!settings.policy.ownUseCertificate) {
+    reasons.push("Own-use certificates are switched off in Settings");
+  }
+  if (oun.registrationNo) reasons.push(`Already registered as ${oun.registrationNo}`);
+  if (a.eligibility !== "Notification required") {
+    reasons.push(
+      `Capacity ${a.installedCapacityKw ?? 0} kW: ${a.eligibility ?? "no generator units recorded"}`,
+    );
+  }
+  if (a.amountPaid < a.feeDue) {
+    reasons.push(
+      `Fee not confirmed by Finance: ${formatNaira(a.amountPaid)} of ${formatNaira(a.feeDue)}`,
+    );
+  }
+  if (!a.documents.documentsComplete) {
+    reasons.push(`Documents outstanding: ${a.documents.outstandingList.join("; ")}`);
+  }
+  // The unpaid fee is already a reason above.
+  const flags = a.flags.filter((f) => f.code !== "FEE_UNPAID");
+  if (flags.length) {
+    const list = flags.map((f) => f.message).join("; ");
+    if (settings.policy.flagsBlockApproval) {
+      reasons.push(`${flags.length} unresolved data flag(s): ${list}`);
+    } else if (!input.flagOverrideReason?.trim()) {
+      reasons.push(
+        `${flags.length} unresolved data flag(s) with no written override reason: ${list}`,
+      );
+    }
+  }
+  reasons.push(
+    ...separationOfDutiesViolations({
+      evaluatingOfficerId: null,
+      reviewingSupervisorId: null,
+      approvingOfficerId: input.actorId,
+      createdById: input.createdById,
+    }),
+  );
+  if (signatoriesMissing(settings)) {
+    reasons.push("Certificate signatory names are not set in Settings");
+  }
+  return reasons;
+}
+
+/** Registration number for an own-use notification: OGSERC/REG/{yyyy}/I-CPT/{serial}. */
+export function ownUseRegistrationNo(settings: Settings, today: IsoDate, serial: number): string {
+  return formatRegistrationNo(
+    settings.registrationPrefix,
+    today,
+    OWN_USE_CATEGORY,
+    OWN_USE_ACTIVITY_CODE,
+    serial,
+  );
+}
+
+/** CERT-01 fields for a registered own-use notification (TEMPLATES.md §3, own-use). */
+export function ownUseCertificateFields(
+  oun: OwnUseInput,
+  a: OwnUseAssessment,
+  ref: ReferenceData,
+  settings: Settings,
+) {
+  const regNo = oun.registrationNo!;
+  const date = certificateDateParts(oun.certificateIssueDate!);
+  const description = findFeeRow(OWN_USE_CATEGORY, ref)?.description ?? "";
+  return {
+    SERIAL: certificateSerial(regNo),
+    REG_NO: regNo,
+    NAME: (oun.name ?? "").toUpperCase(),
+    CAC: oun.cacNo?.trim() || "N/A",
+    ADDRESS: oun.siteAddress?.trim() || "—",
+    CATEGORY: `${OWN_USE_CATEGORY} — ${description}`.trim(),
+    ACTIVITY: `Own-use generation, ${a.installedCapacityKw ?? 0} kW (para 3(4))`,
+    OTHER: "None",
+    AREA: oun.lga ?? "—",
+    LICENCE: "Not applicable (own-use notification)",
+    DAY: date.day,
+    MONTH: date.month,
+    YEAR: date.year,
+    CHAIR_NAME: settings.chairmanName.trim(),
+    COMM_NAME: settings.commissionerName.trim(),
   };
 }
 

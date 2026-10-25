@@ -2,6 +2,38 @@
 
 Decisions made during the build that refine `docs/SPEC.md`. Newest first. If this file and the spec disagree, this file wins; raise anything unclear.
 
+## 2026-10-24 — Category forms REG-01A to K, part 1: common core and documents (SPEC §1, §2.6, §4.13–§4.15)
+
+The Commission now uses 11 category-specific forms instead of one REG-01 (`registration-forms.json`, `reference/forms/`). Part 2 adds the category-specific technical sections. The rules are in the spec; the choices made here:
+
+- **Owner's answers (asked before the build):**
+  - **Own-use certificate** is built now, behind its setting (off): an approving officer registers a paid, complete REG-01I; number `OGSERC/REG/{yyyy}/I-CPT/{serial}` from the year's registration series; CERT-01 stored; QR code to `/verify/own-use/{id}`.
+  - **The evaluator's confirmed category never changes a fee.** If it differs from the category charged, the flag "Category confirmed as X but Category Y is charged" stays until the details are corrected or overridden and an admin recalculates (snapshot pricing).
+  - **Wrong form handling:** the alternative to "accept and re-categorise" is "require the correct form": check 1.10 fails, so the recommended outcome is a deficiency notice.
+  - **Updates and annual confirmations** go through the full workflow (Finance gate, EVAL-01, the same approval rules) and close with the new status **Changes Applied** (final decision "Accept filing and apply changes (para 16)"): no registration number or certificate.
+- **Form filed and category:** the category is still calculated; REG-01I is refused at intake ("record it under Own-use"). Check **1.10** is new and automatic (EVAL-01 now has 56 decision checks); 1.2 and 7.5 name REG-01I. "Category confirmed" is an evaluation action (assigned evaluator or a supervisor, gated, audited, repeatable until a decision). Under "accept", the confirmed category's form's documents apply; shared keys carry received documents over.
+- **Documents:** per-form lists stored by shared key. Evidence of payment is **derived, not stored**: Y once Finance-confirmed payments cover fee − waiver, N/A when nothing is due, otherwise pending — so a reversal un-ticks it and it is listed as pending on the acknowledgement until Finance confirms. A blank condition counts as "applies" (only No makes an item N/A). Values for keys not on the current list are kept, not shown.
+- **Other activities' documents** (setting, off): adds the items of each other activity's form (REG-01{its category}) not already on the list.
+- **Supply / retail at 1 MW or more** is a setting (K) applied on top of the activity map; the activity-map page says so.
+- **Licences table:** the licence flags use any row with a number; renewal and check 4.3 use the nearest expiry. The certificate lists every licence number.
+- **Duplicate checks compare registrations ("families")**: a registration, its updates and annual confirmations share a CAC number and name without a flag or the para 11(4) warning.
+- **Updates:** the form starts as a copy of the registered record (`/submissions/new?filing=UPDATE&reg=…`, or the buttons on a Registered record), so only real changes differ. The submission page lists the changes to apply (registered now → after approval). Approval copies changed fields and replaces changed tables, then marks "certificate needs reissue" if a certificate field changed. A Changes Applied decision cannot be reopened or cancelled. The filing type and link are fixed once saved (DB trigger). Updates are never provisionally registered by the daily review.
+- **Annual confirmations** count for the calendar year in which they are filed. A Registered record is flagged overdue after this year's due date (31 January, a setting) when it was registered before this year and nothing was filed this year; a confirmation filed after the due date in a year when one was due is flagged late.
+- **Fees on updates and annual confirmations:** none by default; with the setting on, the category's registration fee, never a late charge. With nothing to pay, the filing is released for evaluation when saved.
+- **Own-use (REG-01I):** one per site. The duplicate-CAC flag between notifications is gone; the same CAC number at the same site address is flagged and needs confirmation at entry. Capacity is the sum of the generator units (at least one).
+- **Intake stays quick:** only the old required fields plus form filed, filing type and (for linked filings) the registration number are required; the new sections are folded "(optional)" on the form. Tables travel as JSON in hidden inputs; errors name the row ("Row 2: …").
+- **Register:** filters by filing type and form; the form is shown under the category. The export gains Filing Type, Form Filed, Linked Registration No., LGAs Served, Other Activities, Licence / Permit Nos., Nearest Licence Expiry and Category Confirmed (after the Submission Channel column, so the first columns keep the workbook's order).
+- **Workbook import:** rows come in as REG-01{category}, New registration; the licence number and expiry become a licence row; the 13 items are mapped like the migration, with a warning for each value not carried over (none for evidence of payment).
+- **Existing records** (migrations `20261024200000`–`…200300`, in four parts: enums; new columns and tables; data; dropping the old columns and the DB rules):
+  - form filed = REG-01{applied category}, filing type New registration;
+  - the licence number and expiry → one licence row; the secondary activity → an other activity; "holds any licence" and "multi-State licensee" set from the licence status (the other conditions are left unanswered);
+  - old items → new keys: 1 incorporation, 2 constitution, 3 licences, 4 single-line diagram, 5 asset register, 6 financials, 8 tariff order, 9 customer enumeration, 10 whichever environmental item the form has, 11 board resolution. Not carried over: 7 (now several items), 12 (evidence of payment is automatic), 13 (only part of the new multi-State item), and any item not on the record's form. Each submission's audit entry lists what was not carried over;
+  - own-use notifications: one generator-unit row from the recorded total ("Total of n units" when there were several).
+  - `npm run category-forms:dry-run` runs the four migrations in a transaction, reports, and rolls back. Dry run on 24 Oct 2026, **dev database: 0 submissions, 0 own-use notifications** (both databases were cleared on 24 Oct). The integration test `category-forms-migration.test.ts` checks the dry run against the real migration on records in the old shape.
+  - **Not yet applied** to the dev or live database. On Vercel the next production deploy applies them.
+- **Dependency:** `pg` (already installed through embedded-postgres) is now a declared dev dependency, with `@types/pg`, for the dry run.
+- **Open for the Commission:** the five policy settings; whether REG-01G's bulk supply agreement applies only to DisCo bulk supply (the condition was inferred); the new letter and certificate wording for filings and own-use certificates (TEMPLATES.md).
+
 ## 2026-10-24 — Live updates and notifications (not in the spec)
 
 ### Live updates

@@ -73,7 +73,9 @@ describe("workbook import", () => {
       pricedCategory: "F",
       createdById: admin.id,
     });
-    expect(sub.documents).toHaveLength(13);
+    // The workbook's 13 items on REG-01F's keys: items 7, 12 and 13 have no single match.
+    expect(sub.formFiled).toBe("REG-01F");
+    expect(sub.documents).toHaveLength(10);
     expect(sub.evaluation).toMatchObject({ finalDecision: "REGISTER", reasons: "satisfactory" });
     expect(sub.evaluation!.checks).toHaveLength(41);
     expect(sub.evaluation!.evaluatingOfficerId).toBeNull(); // "Blessing" is not a user
@@ -98,12 +100,12 @@ describe("workbook import", () => {
       principalLga: "Ifo",
       otherAreasServed: "",
       primaryActivityCode: "MGD",
-      secondaryActivityCode: "",
+      filingType: "NEW",
+      formFiled: "REG-01E",
       installedCapacityMw: "1",
       customers: "",
       licenceStatus: "NERC registration/permit (mini-grid/captive)",
-      licenceNo: "",
-      licenceExpiry: "",
+      licences: [],
       complianceOfficer: "",
       phone: "",
       email: "",

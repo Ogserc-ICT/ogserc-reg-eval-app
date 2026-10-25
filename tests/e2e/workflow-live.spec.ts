@@ -57,6 +57,7 @@ test.describe.serial("live updates and notifications", () => {
 
     const registry = await as(browser, LARA);
     await registry.goto("/submissions/new");
+    await registry.getByLabel(/^Form filed/).selectOption("REG-01E");
     await registry.getByLabel(/^Registered name/).fill(NAME);
     await registry.getByLabel("CAC number").fill("RC 990011");
     await registry.getByLabel(/^Principal LGA/).selectOption("Ifo");
@@ -65,7 +66,8 @@ test.describe.serial("live updates and notifications", () => {
     await registry
       .getByLabel(/^Licence status/)
       .selectOption("NERC registration/permit (mini-grid/captive)");
-    await registry.getByLabel("Licence number").fill("NERC/MG/77");
+    await registry.getByRole("button", { name: "+ Add licence" }).click();
+    await registry.getByLabel("Number, row 1").fill("NERC/MG/77");
     await registry.getByRole("button", { name: "Save submission" }).click();
     await expect(registry.getByRole("heading", { name: NAME })).toBeVisible();
     // The person who acted is not notified.

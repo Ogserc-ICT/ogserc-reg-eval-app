@@ -7,17 +7,22 @@
 import { categoryAuto, overrideNeedsReason } from "./category";
 import { isIsoDate } from "./dates";
 import { AUTOMATIC_CHECK_IDS } from "./evaluation";
+import { NO_CONDITIONS, formCodeFor, formForCategory, type Conditions } from "./forms";
+import { LEGACY_DOCUMENT_KEYS, mapLegacyDocuments } from "./legacy-documents";
 import { formatNaira } from "./money";
-import { priceOwnUse, type OwnUsePricing } from "./own-use";
+import { priceOwnUse, type OwnUsePricing, type OwnUseUnitInput } from "./own-use";
 import { priceSubmission, type PricingSnapshot } from "./pricing";
 import type { Role } from "./roles";
 import { assessSubmission, type DomainContext } from "./submission";
 import {
+  FILING,
   FINAL_DECISION,
+  LICENCE,
   STATUS,
   STATUSES,
   isClosed,
   type CheckValue,
+  type LicenceInput,
   type FinalDecision,
   type IsoDate,
   type Kobo,
@@ -114,13 +119,17 @@ export interface PlannedSubmission {
     address: string | null;
     principalLga: string;
     otherAreasServed: string | null;
+    /** The workbook has one form, REG-01; rows are filed as REG-01{category applied}. */
+    formFiled: string;
     primaryActivityCode: string;
-    secondaryActivityCode: string | null;
+    otherActivityCodes: string[];
     installedCapacityMw: number | null;
     customers: number | null;
     licenceStatus: string;
-    licenceNo: string | null;
-    licenceExpiry: IsoDate | null;
+    /** The workbook's single licence number and expiry, as one row of the licences table. */
+    licences: LicenceInput[];
+    /** Inferred from the licence status; the others are left unanswered. */
+    conditions: Conditions;
     complianceOfficer: string | null;
     phone: string | null;
     email: string | null;
@@ -137,8 +146,8 @@ export interface PlannedSubmission {
     remarks: string | null;
   };
   pricing: PricingSnapshot;
-  /** Schedule 2 items in order; null = blank (pending). */
-  documents: (CheckValue | null)[];
+  /** Checklist values by the form's document keys (old items mapped, see legacy-documents.ts). */
+  documents: Record<string, Exclude<CheckValue, null>>;
   evaluation: {
     evaluatingOfficerId: string | null;
     reviewingSupervisorId: string | null;
@@ -167,14 +176,12 @@ export interface PlannedOwnUse {
     natureOfBusiness: string | null;
     gridConnected: boolean | null;
     distributionLicensee: string | null;
-    units: number | null;
-    installedCapacityKw: number;
-    fuel: string | null;
-    avgMonthlyOutputMwh: number | null;
     contactPerson: string | null;
     phone: string | null;
     email: string | null;
   };
+  /** The workbook's capacity, fuel and output, as one generator-unit row. */
+  units: OwnUseUnitInput[];
   pricing: OwnUsePricing;
 }
 
@@ -401,6 +408,7 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
     const principalLga = fromList("Principal LGA *", "Principal LGA", lgas, true);
     const primary = activity("Primary Activity *", "Primary Activity", true);
     const secondary = activity("Secondary Activity", "Secondary Activity", false);
+    const otherActivities = secondary && secondary.code !== primary?.code ? [secondary] : [];
     const licenceStatus = fromList("Licence Status *", "Licence Status", licences, true);
     const submissionChannel = fromList("Submission Channel", "Submission Channel", channels, false);
     const registrantType = fromList("Registrant Type", "Registrant Type", types, false);
@@ -494,21 +502,21 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
 
     // Document Checklist row (same row number).
     const docRow = docsByRow.get(r.row);
-    const documents: (CheckValue | null)[] = ref.schedule2Documents.map(() => null);
+    const legacyDocuments: Record<number, CheckValue> = {};
     if (!docRow || cellText(docRow.cells["Acknowledgement No."]) !== ackNo) {
       warn(r.row, ackNo, "No matching Document Checklist row; documents imported as pending");
     } else {
       for (const h of docHeaders(docRow)) {
-        const i = Number(h.split(".")[0]) - 1;
-        if (i < 0 || i >= documents.length) continue;
+        const n = Number(h.split(".")[0]);
+        if (!(n in LEGACY_DOCUMENT_KEYS)) continue;
         const v = cellCheck(docRow.cells[h]);
         if (v === undefined) {
           add("warning", SHEETS.documents)(
             docRow.row,
             ackNo,
-            `Document ${i + 1}: "${cellText(docRow.cells[h])}" is not Y, N or N/A; left pending`,
+            `Document ${n}: "${cellText(docRow.cells[h])}" is not Y, N or N/A; left pending`,
           );
-        } else documents[i] = v;
+        } else legacyDocuments[n] = v;
       }
     }
 
@@ -616,8 +624,9 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
 
     // Pricing with the app's rules (the snapshot), compared with the workbook's own figures.
     const pricingInput = {
+      filingType: FILING.NEW,
       primaryActivity: primary!.name,
-      secondaryActivity: secondary?.name ?? null,
+      otherActivities: otherActivities.map((a) => a.name),
       installedCapacityMw,
       categoryOverride,
       operatingOnEffectiveDate: operating as "Y" | "N",
@@ -638,7 +647,7 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
       failedRefs.set(ackNo, `Register row ${r.row}`);
       continue;
     }
-    const auto = categoryAuto(pricingInput, ref);
+    const auto = categoryAuto(pricingInput, ref, settings.policy);
     const overrideReason =
       categoryOverride && overrideNeedsReason(categoryOverride, auto, null)
         ? OVERRIDE_REASON
@@ -668,6 +677,18 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
       );
     }
 
+    // The workbook's 13 items onto the form's keys; values that do not carry over are reported.
+    const docMap = mapLegacyDocuments(
+      legacyDocuments,
+      formForCategory(pricing.category, ref.forms),
+    );
+    // Evidence of payment (item 12) is not lost: it now ticks itself from confirmed payments.
+    for (const d of docMap.dropped.filter((x) => x.item !== 12)) {
+      warn(r.row, ackNo, `Document ${d.item} (${d.value}) not imported: ${d.why}; left pending`);
+    }
+    const licenceNo = cellText(c("Licence / Permit No."));
+    const licenceExpiry = date("Licence Expiry Date", "Licence Expiry Date");
+
     const planned: PlannedSubmission = {
       row: r.row,
       ackNo,
@@ -682,13 +703,26 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
         address: cellText(c("Registered / Operational Address")),
         principalLga: principalLga!,
         otherAreasServed: cellText(c("Other LGAs / Feeders / Estates Served")),
+        formFiled: formCodeFor(pricing.category),
         primaryActivityCode: primary!.code,
-        secondaryActivityCode: secondary?.code ?? null,
+        otherActivityCodes: otherActivities.map((a) => a.code),
         installedCapacityMw,
         customers,
         licenceStatus: licenceStatus!,
-        licenceNo: cellText(c("Licence / Permit No.")),
-        licenceExpiry: date("Licence Expiry Date", "Licence Expiry Date"),
+        licences:
+          licenceNo || licenceExpiry
+            ? [
+                {
+                  type: licenceStatus!,
+                  issuingAuthority: null,
+                  number: licenceNo,
+                  issueDate: null,
+                  expiryDate: licenceExpiry,
+                  activityCovered: null,
+                },
+              ]
+            : [],
+        conditions: inferredConditions(licenceStatus!),
         complianceOfficer: cellText(c("Compliance Officer")),
         phone,
         email,
@@ -705,7 +739,7 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
         remarks: cellText(c("Remarks")),
       },
       pricing,
-      documents,
+      documents: docMap.mapped,
       evaluation,
     };
     plan.submissions.push(planned);
@@ -807,14 +841,18 @@ export function planWorkbookImport(wb: WorkbookData, ic: ImportContext): ImportP
         natureOfBusiness: cellText(c("Nature of Premises / Business")),
         gridConnected: grid === "Y" ? true : grid === "N" ? false : null,
         distributionLicensee: cellText(c("Distribution Licensee")),
-        units: units ?? null,
-        installedCapacityKw: kw!,
-        fuel: cellText(c("Fuel / Technology")),
-        avgMonthlyOutputMwh: output ?? null,
         contactPerson: cellText(c("Contact Person")),
         phone,
         email,
       },
+      units: [
+        {
+          makeModel: importedUnitLabel(units ?? null),
+          capacityKw: kw!,
+          fuel: cellText(c("Fuel / Technology")),
+          avgMonthlyMwh: output ?? null,
+        },
+      ],
       pricing: priceOwnUse(kw!, ref, settings),
     });
     references.add(ounNo);
@@ -975,6 +1013,9 @@ function toSubmissionInput(
   return {
     id: s.ackNo,
     ackNo: s.ackNo,
+    filingType: FILING.NEW,
+    formFiled: d.formFiled,
+    linkedSubmissionId: null,
     registeredName: d.registeredName,
     dateSubmitted: d.dateSubmitted,
     submissionChannel: d.submissionChannel,
@@ -983,14 +1024,14 @@ function toSubmissionInput(
     tin: d.tin,
     address: d.address,
     principalLga: d.principalLga,
+    lgasServed: [],
     otherAreasServed: d.otherAreasServed,
     primaryActivity: nameOf(d.primaryActivityCode),
-    secondaryActivity: nameOf(d.secondaryActivityCode),
+    otherActivities: d.otherActivityCodes.map(nameOf).filter((n): n is string => !!n),
     installedCapacityMw: d.installedCapacityMw,
     customers: d.customers,
     licenceStatus: d.licenceStatus,
-    licenceNo: d.licenceNo,
-    licenceExpiry: d.licenceExpiry,
+    licences: d.licences,
     complianceOfficer: d.complianceOfficer,
     phone: d.phone,
     email: d.email,
@@ -999,13 +1040,16 @@ function toSubmissionInput(
     approvedWaiver: d.approvedWaiver,
     categoryOverride: d.categoryOverride,
     overrideReason: d.overrideReason,
+    confirmedCategory: null,
+    categoryConfirmedReason: null,
     status: d.status,
     dateSubmissionComplete: d.dateSubmissionComplete,
     deficiencyNoticeDate: d.deficiencyNoticeDate,
     certificateIssueDate: d.certificateIssueDate,
     registrationNo: d.registrationNo,
     remarks: d.remarks,
-    documents: s.documents.map((v) => v ?? null) as CheckValue[],
+    documents: s.documents,
+    conditions: d.conditions,
     pricing: s.pricing,
     releasedForEvaluationDate: null,
     dateEvaluationStarted: s.evaluation.dateEvaluationStarted,
@@ -1025,4 +1069,25 @@ export function planSummary(plan: ImportPlan) {
     skipped: count("skipped"),
     pricingDifferences: plan.pricingDifferences.length,
   };
+}
+
+/**
+ * Conditions that follow from the licence status: "holds any licence" unless unlicensed, and
+ * "multi-State licensee" for a multi-State NERC licence. Used for imported and migrated records.
+ */
+export function inferredConditions(licenceStatus: string | null): Conditions {
+  return {
+    ...NO_CONDITIONS,
+    holds_any_licence: licenceStatus ? (licenceStatus === LICENCE.UNLICENSED ? "N" : "Y") : null,
+    multi_state_licensee: licenceStatus
+      ? licenceStatus === LICENCE.MULTI_STATE
+        ? "Y"
+        : "N"
+      : null,
+  };
+}
+
+/** Make/model text for a generator row made from a workbook total ("No. of Units" units). */
+export function importedUnitLabel(units: number | null): string {
+  return units && units > 1 ? `Total of ${units} units (from the workbook)` : "From the workbook";
 }

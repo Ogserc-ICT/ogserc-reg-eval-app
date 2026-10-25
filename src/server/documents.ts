@@ -4,7 +4,13 @@ import { certificateBlockers, certificateFields } from "@/domain/certificate";
 import { addDays, formatDate } from "@/domain/dates";
 import { can } from "@/domain/roles";
 import type { DomainContext } from "@/domain/submission";
-import { LICENCE, isClosed, type IsoDate } from "@/domain/types";
+import {
+  OWN_USE_CATEGORY,
+  ownUseCertificateFields,
+  type OwnUseAssessment,
+  type OwnUseInput,
+} from "@/domain/own-use";
+import { FILING_LABELS, LICENCE, isClosed, isLinkedFiling, type IsoDate } from "@/domain/types";
 import { reasonSchema } from "@/lib/schemas";
 import { writeAudit } from "./audit";
 import { appToday } from "./clock";
@@ -12,7 +18,7 @@ import { loadContext } from "./context";
 import { BlockedError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { loadEvaluationState, type EvaluationState } from "./evaluation-state";
 import { acknowledgementPdf } from "./pdf/acknowledgement";
-import { verificationUrl } from "./app-url";
+import { ownUseVerificationUrl, verificationUrl } from "./app-url";
 import { certificatePdf } from "./pdf/certificate";
 import { deficiencyPdf } from "./pdf/deficiency";
 import { evaluationFormPdf } from "./pdf/evaluation-form";
@@ -35,16 +41,19 @@ const FILE_SLUG: Record<DocumentKind, string> = {
 
 export const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
+/** The record a document belongs to: a submission, or an own-use notification (its certificate). */
+type Owner = { submissionId: string } | { ownUseNotificationId: string };
+
 /**
- * Store a generated PDF: next version for the submission and kind, SHA-256, and an audit entry.
+ * Store a generated PDF: next version for the record and kind, SHA-256, and an audit entry.
  * A new acknowledgement, evaluation form or certificate supersedes the previous one; each deficiency
- * notice is its own document and supersedes nothing.
+ * notice is its own document and supersedes nothing. `ackNo` is the Ack No. or OUN No.
  */
 async function storeDocument(
   tx: Tx,
   actor: Actor,
   args: {
-    submissionId: string;
+    owner: Owner;
     ackNo: string;
     kind: DocumentKind;
     bytes: Uint8Array;
@@ -53,7 +62,7 @@ async function storeDocument(
   },
 ) {
   const last = await tx.generatedDocument.findFirst({
-    where: { submissionId: args.submissionId, kind: args.kind },
+    where: { ...args.owner, kind: args.kind },
     orderBy: { version: "desc" },
     select: { version: true },
   });
@@ -61,13 +70,13 @@ async function storeDocument(
   const hash = sha256(args.bytes);
   if (args.kind !== "DEFICIENCY_NOTICE") {
     await tx.generatedDocument.updateMany({
-      where: { submissionId: args.submissionId, kind: args.kind, supersededAt: null },
+      where: { ...args.owner, kind: args.kind, supersededAt: null },
       data: { supersededAt: new Date() },
     });
   }
   const doc = await tx.generatedDocument.create({
     data: {
-      submissionId: args.submissionId,
+      ...args.owner,
       kind: args.kind,
       version,
       deficiencyNoticeId: args.deficiencyNoticeId ?? null,
@@ -102,8 +111,14 @@ function acknowledgementContent(state: EvaluationState, ctx: DomainContext, sign
     address: sub.address,
     complianceOfficer: sub.complianceOfficer,
     submissionChannel: sub.submissionChannel,
+    formFiled: sub.formFiled ?? "—",
+    filing: {
+      label: FILING_LABELS[sub.filingType],
+      linked: isLinkedFiling(sub.filingType),
+      linkedRegistrationNo: state.linked?.registrationNo ?? null,
+    },
     primaryActivity: sub.primaryActivity!,
-    secondaryActivity: sub.secondaryActivity,
+    otherActivities: sub.otherActivities,
     installedCapacityMw: sub.installedCapacityMw,
     categoryApplied: a.categoryApplied!,
     categoryDescription: a.categoryDescription ?? "",
@@ -151,7 +166,9 @@ function evaluationFormContent(state: EvaluationState, today: IsoDate) {
   return {
     ackNo: sub.ackNo!,
     registeredName: sub.registeredName!,
-    categoryActivity: `${a.categoryApplied ?? "—"} — ${sub.primaryActivity ?? "—"}`,
+    categoryActivity:
+      `${a.categoryApplied ?? "—"} — ${sub.primaryActivity ?? "—"}; Form ${sub.formFiled ?? "—"}` +
+      (sub.confirmedCategory ? `; category confirmed ${sub.confirmedCategory}` : ""),
     evaluatingOfficer: evaluationRow.evaluatingOfficer?.name ?? null,
     reviewingSupervisor: evaluationRow.reviewingSupervisor?.name ?? null,
     approvingOfficer: evaluationRow.approvingOfficer?.name ?? null,
@@ -185,7 +202,7 @@ export async function storeDeficiencyNotice(
 ) {
   const bytes = await deficiencyPdf(deficiencyContent(state, { ...notice, draft: false }));
   return storeDocument(tx, actor, {
-    submissionId: state.row.id,
+    owner: { submissionId: state.row.id },
     ackNo: state.row.ackNo,
     kind: "DEFICIENCY_NOTICE",
     bytes,
@@ -212,11 +229,42 @@ export async function storeCertificate(
     verifyUrl: verificationUrl(submissionId),
   });
   return storeDocument(tx, actor, {
-    submissionId,
+    owner: { submissionId },
     ackNo: state.row.ackNo,
     kind: "CERTIFICATE",
     bytes,
     note: opts.note,
+  });
+}
+
+/**
+ * Certificate PDF for a registered own-use notification (setting "own-use certificate"). Call inside
+ * the registration transaction, after the number and date are set.
+ */
+export async function storeOwnUseCertificate(
+  tx: Tx,
+  actor: Actor,
+  oun: OwnUseInput,
+  assessment: OwnUseAssessment,
+  ctx: DomainContext,
+  note?: string | null,
+) {
+  if (!oun.registrationNo || !oun.certificateIssueDate) {
+    throw new BlockedError("The certificate cannot be produced.", [
+      "No locked registration number",
+    ]);
+  }
+  const bytes = await certificatePdf({
+    ...ownUseCertificateFields(oun, assessment, ctx.ref, ctx.settings),
+    reissuedOn: null,
+    verifyUrl: ownUseVerificationUrl(oun.id),
+  });
+  return storeDocument(tx, actor, {
+    owner: { ownUseNotificationId: oun.id },
+    ackNo: oun.ounNo!,
+    kind: "CERTIFICATE",
+    bytes,
+    note: note ?? `Category ${OWN_USE_CATEGORY} own-use registration`,
   });
 }
 
@@ -243,7 +291,7 @@ export async function generateAcknowledgement(
       const signatory = state.evaluationRow.evaluatingOfficer?.name ?? actor.name;
       const bytes = await acknowledgementPdf(acknowledgementContent(state, ctx, signatory));
       return storeDocument(tx, actor, {
-        submissionId: id,
+        owner: { submissionId: id },
         ackNo: state.row.ackNo,
         kind: "ACKNOWLEDGEMENT",
         bytes,
@@ -263,7 +311,7 @@ export async function generateEvaluationForm(db: Db, actor: Actor, id: string, t
       const state = await stateOrThrow(tx, id, ctx);
       const bytes = await evaluationFormPdf(evaluationFormContent(state, today));
       return storeDocument(tx, actor, {
-        submissionId: id,
+        owner: { submissionId: id },
         ackNo: state.row.ackNo,
         kind: "EVALUATION_FORM",
         bytes,
@@ -345,10 +393,10 @@ export async function getDocumentForDownload(db: Db, actor: Actor, documentId: s
   return { fileName: doc.fileName, bytes };
 }
 
-/** Documents for a submission, newest first, without their content. */
-export function listDocuments(db: Db, submissionId: string) {
+/** Documents for a submission or own-use notification, newest first, without their content. */
+export function listDocuments(db: Db, owner: string | Owner) {
   return db.generatedDocument.findMany({
-    where: { submissionId },
+    where: typeof owner === "string" ? { submissionId: owner } : owner,
     orderBy: [{ createdAt: "desc" }],
     select: {
       id: true,

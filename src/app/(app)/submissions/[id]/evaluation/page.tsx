@@ -7,7 +7,7 @@ import { evaluationProgress, checkIsEditable } from "@/domain/evaluation";
 import { formatNaira } from "@/domain/money";
 import { nextAction } from "@/domain/next-action";
 import { can, canEditChecks, eligibleOfficers, type Role } from "@/domain/roles";
-import { STATUS, isClosed } from "@/domain/types";
+import { STATUS, isClosed, isLinkedFiling } from "@/domain/types";
 import {
   REFUSAL_GROUNDS,
   approvalBlockers,
@@ -28,6 +28,7 @@ import { requireFinanceGate } from "@/server/finance";
 import { toIsoDate } from "@/server/reference-data";
 import {
   approveAction,
+  confirmCategoryAction,
   assignOfficersAction,
   cancelAction,
   issueDeficiencyAction,
@@ -42,6 +43,7 @@ import {
 import { ChecksForm } from "./checks-form";
 import {
   ApproveFields,
+  CategoryConfirmFields,
   AssignOfficersForm,
   ReasonField,
   RefuseFields,
@@ -119,7 +121,19 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
     createdById: row.createdById,
     actorId: user.id,
     settings,
+    linked: state.linked,
   }).filter((r) => !r.includes(OVERRIDE_MISSING));
+  const linkedFiling = isLinkedFiling(sub.filingType);
+
+  const categoryBlockers = [
+    ...(!canEditChecks(user, ev.evaluatingOfficerId)
+      ? ["Only the assigned evaluating officer or a reviewing supervisor can do this"]
+      : []),
+    ...(ev.finalDecision ? ["A final decision is already recorded"] : []),
+  ];
+  const categoryChoices = ctx.ref.fees
+    .filter((f) => f.category !== "I")
+    .map((f) => ({ category: f.category, description: f.description }));
 
   const refuseBlockers = [
     ...refusalBlockers(
@@ -262,6 +276,26 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
           </Panel>
 
           <Panel title="Actions">
+            {can(roles, "evaluation.editChecks") && !gateBlocked && !closed && (
+              <WorkflowAction
+                title="Category confirmed"
+                description={
+                  sub.confirmedCategory
+                    ? `Confirmed as Category ${sub.confirmedCategory}${sub.categoryConfirmedReason ? ` (${sub.categoryConfirmedReason})` : ""}. Check 1.10 compares it with the form filed.`
+                    : "Confirm the Schedule 3 category the submission belongs in (check 1.10). It does not change the fee: an admin recalculates if the category charged differs."
+                }
+                blockers={categoryBlockers}
+                action={confirmCategoryAction.bind(null, id)}
+                submitLabel="Confirm category"
+              >
+                <CategoryConfirmFields
+                  categories={categoryChoices}
+                  current={sub.confirmedCategory ?? a.formCategory ?? a.categoryApplied ?? ""}
+                  formFiled={sub.formFiled ?? "—"}
+                  formCategory={a.formCategory}
+                />
+              </WorkflowAction>
+            )}
             {can(roles, "submission.markComplete") && !gateBlocked && (
               <WorkflowAction
                 title="Mark submission complete"
@@ -291,11 +325,15 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
             )}
             {can(roles, "submission.approve") && !gateBlocked && (
               <WorkflowAction
-                title="Approve and register"
-                description="Para 13(1)(a). Generates and locks the registration number."
+                title={linkedFiling ? "Approve and apply the changes" : "Approve and register"}
+                description={
+                  linkedFiling
+                    ? `Para 16. Applies this filing's changes to ${state.linked?.registrationNo ?? "the registration"} (listed on the submission page); no new number or certificate.`
+                    : "Para 13(1)(a). Generates and locks the registration number."
+                }
                 blockers={approveBlockers}
                 action={approveAction.bind(null, id)}
-                submitLabel="Approve and register"
+                submitLabel={linkedFiling ? "Approve and apply" : "Approve and register"}
               >
                 <ApproveFields
                   needsOverride={needsOverride && !closed}
@@ -345,7 +383,9 @@ export default async function EvaluationPage({ params }: { params: Promise<{ id:
                     ? [
                         `Registered as ${row.registrationNo}: cancel the registration instead (para 14)`,
                       ]
-                    : []
+                    : sub.status === STATUS.APPLIED
+                      ? ["The changes are applied to the registration: file a new update instead"]
+                      : []
                 }
                 action={reopenAction.bind(null, id)}
                 submitLabel="Reopen decision"

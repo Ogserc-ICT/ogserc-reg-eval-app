@@ -82,12 +82,18 @@ const SETTINGS_TEXT = [
   "feesRevisedOn",
   "tinPattern",
   "unpaidReminderDays",
+  "supplyRetailCategory1MwPlus",
+  "wrongFormHandling",
+  "annualConfirmationDue",
 ] as const;
 const SETTINGS_BOOL = [
   "lateChargeBlocksCompleteness",
   "waiverAppliesToLateCharge",
   "flagsBlockApproval",
   "lateChargeRequiredForRelease",
+  "otherActivitiesRequireDocuments",
+  "ownUseCertificate",
+  "filingFeeOnUpdates",
 ] as const;
 
 export async function updateSettingsAction(_prev: ActionState, fd: FormData): Promise<ActionState> {

@@ -58,7 +58,7 @@ export function RegisterTable({
               )}
               <th className="px-2 py-2">Ack No.</th>
               <th className="px-2 py-2">Registered name</th>
-              <th className="px-2 py-2">Cat.</th>
+              <th className="px-2 py-2">Cat. / form</th>
               <th className="px-2 py-2">Status</th>
               <th className="px-2 py-2">Submitted</th>
               <th className="px-2 py-2 text-right">Total due</th>
@@ -92,8 +92,19 @@ export function RegisterTable({
                     {r.ackNo}
                   </Link>
                 </td>
-                <td className="px-2 py-1.5">{r.registeredName}</td>
-                <td className="px-2 py-1.5">{r.category ?? "—"}</td>
+                <td className="px-2 py-1.5">
+                  {r.registeredName}
+                  {r.filingType !== "NEW" && (
+                    <span className="block text-xs text-gray-500">
+                      {r.filingLabel}
+                      {r.linkedRegistrationNo && ` · ${r.linkedRegistrationNo}`}
+                    </span>
+                  )}
+                </td>
+                <td className="px-2 py-1.5">
+                  {r.category ?? "—"}
+                  <span className="block text-xs text-gray-500">{r.formFiled}</span>
+                </td>
                 <td className="px-2 py-1.5">
                   <StatusBadge status={r.status} />
                   <span className="block text-xs text-gray-500">Stage {r.stage}</span>

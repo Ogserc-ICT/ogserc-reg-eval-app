@@ -1,5 +1,7 @@
+import { conditionsUsedBy, OWN_USE_FORM } from "@/domain/forms";
 import { eligibleOfficers } from "@/domain/roles";
-import { loadList } from "./reference-data";
+import { HSE_TYPES } from "@/lib/schemas";
+import { loadList, loadReferenceData, loadSettings } from "./reference-data";
 import type { Db } from "./types";
 
 /** Drop-down options for the Register, payment and own-use forms, all from the DB (seeded data). */
@@ -15,6 +17,8 @@ export async function loadFormOptions(db: Db) {
     fuels,
     purposes,
     paymentChannels,
+    ref,
+    settings,
   ] = await Promise.all([
     db.activity.findMany({ orderBy: { sortOrder: "asc" }, select: { code: true, name: true } }),
     db.lga.findMany({ orderBy: { sortOrder: "asc" }, select: { name: true } }),
@@ -32,6 +36,8 @@ export async function loadFormOptions(db: Db) {
     loadList(db, "fuel_technologies"),
     loadList(db, "payment_purposes"),
     loadList(db, "payment_channels"),
+    loadReferenceData(db),
+    loadSettings(db),
   ]);
   return {
     activities,
@@ -48,6 +54,18 @@ export async function loadFormOptions(db: Db) {
     fuels,
     purposes,
     paymentChannels,
+    /** REG-01A to K (not REG-01I, the own-use form) and the conditions their documents use. */
+    forms: ref.forms
+      .filter((f) => f.form !== OWN_USE_FORM)
+      .map((f) => ({
+        form: f.form,
+        category: f.category,
+        title: f.title,
+        conditions: conditionsUsedBy([f]),
+      })),
+    /** Other activities need their own form's documents: every condition may then apply. */
+    otherActivitiesRequireDocuments: settings.policy.otherActivitiesRequireDocuments,
+    hseTypes: [...HSE_TYPES],
   };
 }
 

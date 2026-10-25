@@ -12,8 +12,12 @@ export interface AcknowledgementContent {
   address: string | null;
   complianceOfficer: string | null;
   submissionChannel: string | null;
+  /** Form filed, e.g. REG-01E. */
+  formFiled: string;
+  /** "New registration", or an update / annual confirmation with the registration it refers to. */
+  filing: { label: string; linkedRegistrationNo: string | null; linked: boolean };
   primaryActivity: string;
-  secondaryActivity: string | null;
+  otherActivities: string[];
   installedCapacityMw: number | null;
   categoryApplied: string;
   categoryDescription: string;
@@ -82,9 +86,12 @@ export async function acknowledgementPdf(c: AcknowledgementContent): Promise<Uin
         `${formatDate(c.dateSubmitted)}${channelPhrase(c.submissionChannel)}`,
       ],
       [
-        "Activities declared",
-        c.secondaryActivity ? `${c.primaryActivity}; ${c.secondaryActivity}` : c.primaryActivity,
+        "Filing",
+        c.filing.linked
+          ? `${c.filing.label} of registration ${c.filing.linkedRegistrationNo ?? "—"}, on Form ${c.formFiled}`
+          : `${c.filing.label}, on Form ${c.formFiled}`,
       ],
+      ["Activities declared", [c.primaryActivity, ...c.otherActivities].join("; ")],
       [
         "Installed capacity",
         c.installedCapacityMw === null ? "—" : `${c.installedCapacityMw.toFixed(2)} MW`,
@@ -125,7 +132,12 @@ export async function acknowledgementPdf(c: AcknowledgementContent): Promise<Uin
     "Evaluation. The Commission will now evaluate your submission. It is complete when it includes the information and documents required by paragraph 12 and evidence of payment of the registration fee (paragraph 13(1)).",
     `Decision within ${c.determinationDays} days. Within ${det} days of receiving a complete submission, the Commission will either issue a Registration Certificate bearing a unique OGSERC registration number (paragraph 13(1)(a)) or notify you in writing of any missing or deficient information (paragraph 13(1)(b)).`,
     `Deficiency notice. If you receive one, you must supply the information within ${def} days, or your submission will lapse and you will be treated as not registered (paragraph 13(2)).`,
-    `Provisional registration. If the Commission has not acted within ${det} days of receiving your complete submission, you are provisionally registered from the next day, and the acknowledgement number above serves as your registration number (paragraph 13(4)).`,
+    // Provisional registration (para 13(4)) applies to registrations, not updates or confirmations.
+    ...(c.filing.linked
+      ? []
+      : [
+          `Provisional registration. If the Commission has not acted within ${det} days of receiving your complete submission, you are provisionally registered from the next day, and the acknowledgement number above serves as your registration number (paragraph 13(4)).`,
+        ]),
     "Verification. Authorized officers may inspect your installations, meters and records on not less than forty-eight (48) hours' notice (paragraph 22).",
     "Refusal only on stated grounds, after written reasons and fourteen (14) days to respond (paragraphs 13(3) and 20).",
   ]);

@@ -124,6 +124,44 @@ export function ApproveFields({
   );
 }
 
+/** "Category confirmed" (official-use box): the category, and why it differs from the form filed. */
+export function CategoryConfirmFields({
+  categories,
+  current,
+  formFiled,
+  formCategory,
+}: {
+  categories: { category: string; description: string }[];
+  current: string;
+  formFiled: string;
+  formCategory: string | null;
+}) {
+  return (
+    <>
+      <Field
+        label="Category confirmed"
+        name="category"
+        hint={`The form filed, ${formFiled}, is for Category ${formCategory ?? "?"}.`}
+      >
+        <select id="category" name="category" defaultValue={current} className={inputClass}>
+          {categories.map((c) => (
+            <option key={c.category} value={c.category}>
+              {c.category} – {c.description}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field
+        label="Reason, if it differs from the form filed"
+        name="reason"
+        hint="Required when the category is not the form's."
+      >
+        <textarea id="reason" name="reason" rows={2} className={inputClass} />
+      </Field>
+    </>
+  );
+}
+
 export function RefuseFields({ grounds }: { grounds: readonly string[] }) {
   return (
     <>

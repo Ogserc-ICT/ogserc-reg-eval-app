@@ -314,7 +314,8 @@
     "Registered",
     "Lapsed",
     "Refused",
-    "Cancelled"
+    "Cancelled",
+    "Changes Applied"
   ],
   "registrant_types": [
     "Company",
@@ -322,7 +323,8 @@
     "Partnership",
     "Sole Proprietor",
     "Public Body",
-    "Community Organization"
+    "Community Organization",
+    "Other"
   ],
   "licence_statuses": [
     "OGSERC licence/permit",
@@ -363,22 +365,8 @@
     "Refuse (13(3)) - after show-cause",
     "Treat as lapsed (13(2))",
     "Provisional registration (13(4))",
-    "Redirect to OUN-01 / outside scope"
-  ],
-  "schedule2_documents": [
-    "1. CAC certificate & status report (or equivalent)",
-    "2. Memorandum & articles (or equivalent)",
-    "3. Copy of every licence / permit / registration",
-    "4. Single-line diagram",
-    "5. Asset register with GPS coordinates",
-    "6. Audited financials, 2 yrs (or para 12(2) alternative)",
-    "7. PPAs, gas, bulk supply & franchise agreements",
-    "8. Tariff orders / schedules applied",
-    "9. Customer enumeration summary",
-    "10. Environmental & safety permits / EIA",
-    "11. Board resolution or equivalent authorization",
-    "12. Evidence of registration fee payment",
-    "13. Multi-State: Ogun asset/customer register & boundary points"
+    "Redirect to REG-01I / outside scope",
+    "Accept filing and apply changes (para 16)"
   ],
   "evaluation_checks": [
     {
@@ -389,7 +377,7 @@
     {
       "stage": "STAGE 1 — RECEIPT AND SCOPE",
       "id": "1.2",
-      "text": "Correct form used: REG-01 for operators; OUN-01 for own-use 200 kW to <1 MW"
+      "text": "Correct form used: REG-01A to K for operators; REG-01I for own-use 200 kW to <1 MW"
     },
     {
       "stage": "STAGE 1 — RECEIPT AND SCOPE",
@@ -425,6 +413,11 @@
       "stage": "STAGE 1 — RECEIPT AND SCOPE",
       "id": "1.9",
       "text": "If late: days late recorded and Schedule 3 Part B late charge calculated"
+    },
+    {
+      "id": "1.10",
+      "stage": "STAGE 1 — RECEIPT AND SCOPE",
+      "text": "Form filed matches the confirmed category (or accepted and re-categorised with reasons)"
     },
     {
       "stage": "STAGE 2 — SCHEDULE 1 FORM",
@@ -649,7 +642,7 @@
     {
       "stage": "STAGE 7 — REGULATORY FLAGS",
       "id": "7.5",
-      "text": "Own-use site of 1 MW+ on OUN-01 directed to REG-01 (3(3)(c))"
+      "text": "Own-use site of 1 MW+ on REG-01I directed to REG-01C or REG-01D (3(3)(c))"
     },
     {
       "stage": "STAGE 7 — REGULATORY FLAGS",
@@ -691,5 +684,20 @@
       "id": "9.7",
       "text": "Physical and electronic file closed and indexed"
     }
+  ],
+  "schedule2_documents_legacy": [
+    "1. CAC certificate & status report (or equivalent)",
+    "2. Memorandum & articles (or equivalent)",
+    "3. Copy of every licence / permit / registration",
+    "4. Single-line diagram",
+    "5. Asset register with GPS coordinates",
+    "6. Audited financials, 2 yrs (or para 12(2) alternative)",
+    "7. PPAs, gas, bulk supply & franchise agreements",
+    "8. Tariff orders / schedules applied",
+    "9. Customer enumeration summary",
+    "10. Environmental & safety permits / EIA",
+    "11. Board resolution or equivalent authorization",
+    "12. Evidence of registration fee payment",
+    "13. Multi-State: Ogun asset/customer register & boundary points"
   ]
 }

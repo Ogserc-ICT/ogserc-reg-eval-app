@@ -1,6 +1,7 @@
 // Seed, DB↔domain mapping, integrity triggers and counters against a real Postgres.
 import type { Prisma } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import forms from "../../registration-forms.json";
 import seed from "../../seed-data.json";
 import { referenceDataFromSeed, settingsFromSeed } from "@/domain/reference";
 import { COUNTER, nextCounter } from "@/server/counters";
@@ -19,13 +20,16 @@ describe("seed", () => {
     expect(await db.feeCategory.count()).toBe(11);
     expect(await db.activity.count()).toBe(14);
     expect(await db.lga.count()).toBe(20);
-    expect(await db.schedule2Document.count()).toBe(13);
-    expect(await db.evaluationCheck.count()).toBe(62);
+    expect(await db.registrationForm.count()).toBe(11);
+    expect(await db.formDocument.count()).toBe(
+      forms.forms.reduce((n, f) => n + f.documents.length, 0),
+    );
+    expect(await db.evaluationCheck.count()).toBe(63);
     expect(await loadList(db, "licence_statuses")).toEqual(seed.licence_statuses);
   });
 
   it("round-trips to exactly the domain data built from seed-data.json", async () => {
-    expect(await loadReferenceData(db)).toEqual(referenceDataFromSeed(seed));
+    expect(await loadReferenceData(db)).toEqual(referenceDataFromSeed(seed, forms));
     expect(await loadSettings(db)).toEqual(settingsFromSeed(seed));
   });
 
@@ -149,6 +153,7 @@ describe("integrity rules", () => {
           registeredName: "Direct Insert Ltd",
           dateSubmitted: new Date("2026-10-22T00:00:00Z"),
           principalLga: "Ifo",
+          formFiled: "REG-01E",
           primaryActivityCode: "MGD",
           licenceStatus: "Unlicensed",
           operatingOnEffectiveDate: true,

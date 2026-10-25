@@ -22,6 +22,8 @@ import {
 import { toIsoDate } from "./reference-data";
 import {
   CHECK_FROM_DB,
+  otherFromRow,
+  otherSelect,
   paymentFromRow,
   submissionFromRow,
   submissionInclude,
@@ -36,6 +38,7 @@ export const DECISION_FROM_DB: Record<DbFinalDecision, FinalDecision> = {
   LAPSE: FINAL_DECISION.LAPSE,
   PROVISIONAL: FINAL_DECISION.PROVISIONAL,
   REDIRECT: FINAL_DECISION.REDIRECT,
+  APPLY: FINAL_DECISION.APPLY,
 };
 
 /** The CheckValue enum is stored under its labels (@map): "N/A" is the Prisma value NA. */
@@ -84,9 +87,15 @@ function buildState<R extends SubmissionRowLike>(
   others: readonly OtherSubmission[] | DuplicateIndex,
   ctx: DomainContext,
 ) {
-  const sub = submissionFromRow(row, ctx.ref.schedule2Documents.length);
+  const sub = submissionFromRow(row);
   const assessment = assessSubmission(sub, payments, ctx);
-  const flags = dataFlags(sub, assessment, others, ctx);
+  const index = Array.isArray(others) ? duplicateIndex(others) : (others as DuplicateIndex);
+  const flags = dataFlags(sub, assessment, index, ctx);
+  // Updates and annual confirmations: the registered record they apply to.
+  const linkedRow = sub.linkedSubmissionId ? index.byId.get(sub.linkedSubmissionId) : undefined;
+  const linked = linkedRow
+    ? { id: linkedRow.id, status: linkedRow.status, registrationNo: linkedRow.registrationNo }
+    : null;
 
   const evaluation: EvaluationInput = {
     evaluatingOfficerId: ev.evaluatingOfficerId,
@@ -128,12 +137,11 @@ function buildState<R extends SubmissionRowLike>(
     checks,
     counts,
     checksFor,
+    linked,
     status: evaluationStatus(evaluation, counts),
     recommended: recommendedOutcome(checks, counts, sub, assessment, evaluation, ctx.today),
   };
 }
-
-const otherSelect = { id: true, cacNo: true, registeredName: true, registrationNo: true } as const;
 
 /**
  * A stored submission with everything the evaluation and workflow rules need: assessment, flags,
@@ -144,7 +152,13 @@ export async function loadEvaluationState(db: Db | Tx, id: string, ctx: DomainCo
   const row = await db.submission.findUnique({ where: { id }, include: stateInclude });
   if (!row?.evaluation) return null;
   const others = await db.submission.findMany({ where: { id: { not: id } }, select: otherSelect });
-  return buildState(row, row.payments.map(paymentFromRow), row.evaluation, others, ctx);
+  return buildState(
+    row,
+    row.payments.map(paymentFromRow),
+    row.evaluation,
+    others.map(otherFromRow),
+    ctx,
+  );
 }
 
 export type EvaluationState = NonNullable<Awaited<ReturnType<typeof loadEvaluationState>>>;
@@ -167,21 +181,27 @@ export async function loadEvaluationStates(
   ctx: DomainContext,
   where: Prisma.SubmissionWhereInput = {},
 ) {
-  const [rows, all, evaluations, users, payments, documents, answers] = await Promise.all([
-    db.submission.findMany({ where, orderBy: { ackSeq: "desc" } }),
-    db.submission.findMany({ select: otherSelect }),
-    db.evaluation.findMany(),
-    db.user.findMany({ select: { id: true, name: true } }),
-    db.payment.findMany({ where: { submissionId: { not: null } }, orderBy: { paymentSeq: "asc" } }),
-    grouped(
-      db.$queryRaw`SELECT "submissionId" AS id, string_agg("documentNumber"::text || '=' || "value"::text, ',') AS pairs
+  const [rows, all, evaluations, users, payments, documents, answers, others, licences] =
+    await Promise.all([
+      db.submission.findMany({ where, orderBy: { ackSeq: "desc" } }),
+      db.submission.findMany({ select: otherSelect }),
+      db.evaluation.findMany(),
+      db.user.findMany({ select: { id: true, name: true } }),
+      db.payment.findMany({
+        where: { submissionId: { not: null } },
+        orderBy: { paymentSeq: "asc" },
+      }),
+      grouped(
+        db.$queryRaw`SELECT "submissionId" AS id, string_agg("documentKey" || '=' || "value"::text, ',') AS pairs
         FROM "DocumentChecklistItem" GROUP BY "submissionId"`,
-    ),
-    grouped(
-      db.$queryRaw`SELECT "evaluationId" AS id, string_agg("checkId" || '=' || "value"::text, ',') AS pairs
+      ),
+      grouped(
+        db.$queryRaw`SELECT "evaluationId" AS id, string_agg("checkId" || '=' || "value"::text, ',') AS pairs
         FROM "EvaluationCheckValue" GROUP BY "evaluationId"`,
-    ),
-  ]);
+      ),
+      db.submissionActivity.findMany({ orderBy: { sortOrder: "asc" } }),
+      db.submissionLicence.findMany({ orderBy: { sortOrder: "asc" } }),
+    ]);
 
   const activityName = new Map(ctx.ref.activities.map((a) => [a.code, a.name]));
   const userName = new Map(users.map((u) => [u.id, { name: u.name }]));
@@ -193,7 +213,18 @@ export async function loadEvaluationStates(
     if (list) list.push(paymentFromRow(p));
     else paymentsOf.set(p.submissionId!, [paymentFromRow(p)]);
   }
-  const index = duplicateIndex(all);
+  const index = duplicateIndex(all.map(otherFromRow));
+  const byOwner = <T extends { submissionId: string }>(list: T[]) => {
+    const map = new Map<string, T[]>();
+    for (const item of list) {
+      const owned = map.get(item.submissionId);
+      if (owned) owned.push(item);
+      else map.set(item.submissionId, [item]);
+    }
+    return map;
+  };
+  const otherActivitiesOf = byOwner(others);
+  const licencesOf = byOwner(licences);
 
   return rows.flatMap((r) => {
     const ev = evaluationOf.get(r.id);
@@ -201,11 +232,13 @@ export async function loadEvaluationStates(
     const row = {
       ...r,
       primaryActivity: { name: activityName.get(r.primaryActivityCode) ?? r.primaryActivityCode },
-      secondaryActivity: r.secondaryActivityCode
-        ? { name: activityName.get(r.secondaryActivityCode) ?? r.secondaryActivityCode }
-        : null,
-      documents: (documents.get(r.id) ?? []).map(([n, v]) => ({
-        documentNumber: Number(n),
+      otherActivities: (otherActivitiesOf.get(r.id) ?? []).map((a) => ({
+        activityCode: a.activityCode,
+        activity: { name: activityName.get(a.activityCode) ?? a.activityCode },
+      })),
+      licences: licencesOf.get(r.id) ?? [],
+      documents: (documents.get(r.id) ?? []).map(([key, v]) => ({
+        documentKey: key,
         value: CHECK_VALUE_FROM_LABEL[v]!,
       })),
       evaluation: { dateEvaluationStarted: ev.dateEvaluationStarted },

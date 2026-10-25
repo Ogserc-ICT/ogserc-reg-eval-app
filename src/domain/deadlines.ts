@@ -1,6 +1,6 @@
 import { addDays, daysBetween } from "./dates";
 import type { Settings } from "./reference";
-import { LICENCE, type IsoDate, type YesNo } from "./types";
+import { LICENCE, type IsoDate, type LicenceInput, type YesNo } from "./types";
 
 /** Deadline for operators already operating on the Effective Date (para 11(1), 25). */
 export function existingOperatorDeadline(settings: Settings): IsoDate {
@@ -59,4 +59,18 @@ export function licenceNeedsRenewal(
 ): boolean {
   if (!licenceExpiry) return false;
   return daysBetween(effectiveDate, licenceExpiry) <= windowDays;
+}
+
+/** The earliest expiry date in the licences table: licence flags and check 4.3 use it. */
+export function nearestLicenceExpiry(licences: readonly LicenceInput[]): IsoDate | null {
+  const dates = licences.map((l) => l.expiryDate).filter((d): d is IsoDate => !!d);
+  return dates.length ? dates.reduce((a, b) => (b < a ? b : a)) : null;
+}
+
+/** Para 16(2): the annual confirmation for `year` is due on Settings' "MM-DD" (31 January). */
+export function annualConfirmationDue(
+  year: number,
+  settings: Pick<Settings, "annualConfirmationDue">,
+): IsoDate {
+  return `${year}-${settings.annualConfirmationDue}`;
 }

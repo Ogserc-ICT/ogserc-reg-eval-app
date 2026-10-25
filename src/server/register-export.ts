@@ -3,7 +3,7 @@ import { formatDate } from "@/domain/dates";
 import type { DataFlag } from "@/domain/flags";
 import { can } from "@/domain/roles";
 import type { Assessment } from "@/domain/submission";
-import type { SubmissionInput } from "@/domain/types";
+import { FILING_LABELS, type SubmissionInput } from "@/domain/types";
 import { toCsv, type Cell } from "@/lib/csv";
 import { writeAudit } from "./audit";
 import { describeFilters } from "./audit-log";
@@ -37,6 +37,19 @@ export const REGISTER_COLUMNS: Column[] = [
   { header: "Registered Name", kind: "text", width: 36, value: (e) => e.sub.registeredName },
   { header: "Date Submitted", kind: "date", width: 12, value: (e) => e.sub.dateSubmitted },
   { header: "Submission Channel", kind: "text", width: 14, value: (e) => e.sub.submissionChannel },
+  {
+    header: "Filing Type",
+    kind: "text",
+    width: 18,
+    value: (e) => FILING_LABELS[e.sub.filingType],
+  },
+  { header: "Form Filed", kind: "text", width: 10, value: (e) => e.sub.formFiled },
+  {
+    header: "Linked Registration No.",
+    kind: "text",
+    width: 26,
+    value: (e) => e.row.linkedRegistrationNo,
+  },
   { header: "Registrant Type", kind: "text", width: 14, value: (e) => e.sub.registrantType },
   { header: "CAC / Registration No.", kind: "text", width: 16, value: (e) => e.sub.cacNo },
   { header: "TIN", kind: "text", width: 16, value: (e) => e.sub.tin },
@@ -48,13 +61,24 @@ export const REGISTER_COLUMNS: Column[] = [
   },
   { header: "Principal LGA", kind: "text", width: 16, value: (e) => e.sub.principalLga },
   {
-    header: "Other LGAs / Feeders / Estates Served",
+    header: "LGAs Served",
+    kind: "text",
+    width: 30,
+    value: (e) => e.sub.lgasServed.join(", ") || null,
+  },
+  {
+    header: "Towns / Communities / Estates Served",
     kind: "text",
     width: 30,
     value: (e) => e.sub.otherAreasServed,
   },
   { header: "Primary Activity", kind: "text", width: 36, value: (e) => e.sub.primaryActivity },
-  { header: "Secondary Activity", kind: "text", width: 30, value: (e) => e.sub.secondaryActivity },
+  {
+    header: "Other Activities",
+    kind: "text",
+    width: 30,
+    value: (e) => e.sub.otherActivities.join("; ") || null,
+  },
   { header: "Activity Code", kind: "text", width: 9, value: (e) => e.assessment.primaryCode },
   {
     header: "Installed Capacity (MW)",
@@ -64,14 +88,34 @@ export const REGISTER_COLUMNS: Column[] = [
   },
   { header: "Customers (No.)", kind: "number", width: 11, value: (e) => e.sub.customers },
   { header: "Licence Status", kind: "text", width: 30, value: (e) => e.sub.licenceStatus },
-  { header: "Licence / Permit No.", kind: "text", width: 16, value: (e) => e.sub.licenceNo },
-  { header: "Licence Expiry Date", kind: "date", width: 12, value: (e) => e.sub.licenceExpiry },
+  {
+    header: "Licence / Permit Nos.",
+    kind: "text",
+    width: 20,
+    value: (e) =>
+      e.sub.licences
+        .map((l) => l.number)
+        .filter(Boolean)
+        .join("; ") || null,
+  },
+  {
+    header: "Nearest Licence Expiry",
+    kind: "date",
+    width: 12,
+    value: (e) => e.assessment.nearestLicenceExpiry,
+  },
   { header: "Compliance Officer", kind: "text", width: 20, value: (e) => e.sub.complianceOfficer },
   { header: "Phone", kind: "text", width: 15, value: (e) => e.sub.phone },
   { header: "Email", kind: "text", width: 26, value: (e) => e.sub.email },
   { header: "Category (Auto)", kind: "text", width: 9, value: (e) => e.assessment.categoryAuto },
   { header: "Category Override", kind: "text", width: 9, value: (e) => e.sub.categoryOverride },
   { header: "Override Reason", kind: "text", width: 24, value: (e) => e.sub.overrideReason },
+  {
+    header: "Category Confirmed",
+    kind: "text",
+    width: 9,
+    value: (e) => e.sub.confirmedCategory,
+  },
   {
     header: "Category Applied",
     kind: "text",

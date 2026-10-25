@@ -1,4 +1,6 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
+import formsFile from "../../registration-forms.json";
+import { PAYMENT_EVIDENCE_KEY } from "@/domain/forms";
 import { inject } from "vitest";
 import type { Role } from "@/domain/roles";
 import { formatAckNo } from "@/domain/numbers";
@@ -74,8 +76,9 @@ export async function saveSubmission(
   const capacity = input.installedCapacityMw === undefined ? 2.5 : input.installedCapacityMw;
   return db.$transaction(async (tx) => {
     const pricing = await priceNewSubmission(tx, {
+      filingType: "NEW",
       primaryActivity: activity.name,
-      secondaryActivity: null,
+      otherActivities: [],
       installedCapacityMw: capacity,
       categoryOverride: null,
       operatingOnEffectiveDate: operating ? "Y" : "N",
@@ -89,10 +92,11 @@ export async function saveSubmission(
         registeredName: `Registrant ${seq} Ltd`,
         dateSubmitted: fromIsoDate(dateSubmitted),
         principalLga: "Ifo",
+        formFiled: `REG-01${pricing.pricedCategory}`,
         primaryActivityCode: activityCode,
         installedCapacityMw: capacity,
         licenceStatus: input.licenceStatus ?? "NERC registration/permit (mini-grid/captive)",
-        licenceNo: "NERC/1",
+        licences: { create: [{ sortOrder: 1, number: "NERC/1" }] },
         operatingOnEffectiveDate: operating,
         plannedStartDate: fromIsoDate(input.plannedStartDate ?? null),
         createdById,
@@ -128,4 +132,31 @@ export async function confirmPayments(db: PrismaClient, reference: string, today
     await confirmPayment(db, finance, p.id, { verified: true, remarks: "" }, { today });
   }
   return finance;
+}
+
+/** A form's checklist (every item staff set by hand) with one value, for updateDocuments. */
+export function formDocuments(form = "REG-01E", value = "Y"): Record<string, string> {
+  const def = formsFile.forms.find((f) => f.form === form);
+  if (!def) throw new Error(`No form ${form}`);
+  return Object.fromEntries(
+    def.documents.filter((d) => d.key !== PAYMENT_EVIDENCE_KEY).map((d) => [d.key, value]),
+  );
+}
+
+/** The evaluator confirms the category of the form filed (check 1.10), as before approval. */
+export async function confirmFormCategory(
+  db: PrismaClient,
+  evaluator: Actor,
+  id: string,
+  today?: string,
+) {
+  const { confirmCategory } = await import("@/server/workflow");
+  const row = await db.submission.findUniqueOrThrow({ where: { id } });
+  await confirmCategory(
+    db,
+    evaluator,
+    id,
+    { category: row.formFiled.slice(-1), reason: "" },
+    { today },
+  );
 }

@@ -13,6 +13,7 @@ import {
   formatRegistrationNo,
 } from "../src/domain/numbers";
 import { AUTOMATIC_CHECK_IDS } from "../src/domain/evaluation";
+import { PAYMENT_EVIDENCE_KEY, formCodeFor, formForCategory } from "../src/domain/forms";
 import { priceOwnUse } from "../src/domain/own-use";
 import { priceSubmission } from "../src/domain/pricing";
 import type { Activity } from "../src/domain/reference";
@@ -227,7 +228,9 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
   type Row = {
     submission: Prisma.SubmissionCreateManyInput;
     evaluation: Omit<Prisma.EvaluationCreateManyInput, "submissionId">;
-    documents: { documentNumber: number; value: "Y" | "N" | "NA" }[];
+    documents: { documentKey: string; value: "Y" | "N" | "NA" }[];
+    otherActivityCode: string | null;
+    licence: Omit<Prisma.SubmissionLicenceCreateManyInput, "submissionId"> | null;
     payments: Omit<Prisma.PaymentCreateManyInput, "submissionId">[];
     notice: Omit<Prisma.DeficiencyNoticeCreateManyInput, "submissionId"> | null;
   };
@@ -261,8 +264,9 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
     if (age < 16 && status === "DEFICIENCY") status = "RECEIVED";
 
     const pricingInput = {
+      filingType: "NEW" as const,
       primaryActivity: activity.name,
-      secondaryActivity: secondary?.name ?? null,
+      otherActivities: secondary ? [secondary.name] : [],
       installedCapacityMw: capacity,
       categoryOverride: null,
       operatingOnEffectiveDate: operating ? ("Y" as const) : ("N" as const),
@@ -394,10 +398,13 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
     }
 
     const docsComplete = complete || chance(0.3);
-    const documents = ref.schedule2Documents
-      .map((_, d) => ({
-        documentNumber: d + 1,
-        value: (d === 12 && code !== "MSL"
+    // The form for the category charged; evidence of payment ticks itself from confirmed payments.
+    const form = formForCategory(pricing.category, ref.forms)!;
+    const documents = form.documents
+      .filter((d) => d.key !== PAYMENT_EVIDENCE_KEY)
+      .map((d) => ({
+        documentKey: d.key,
+        value: (d.requiredWhen && chance(0.5)
           ? "NA"
           : docsComplete
             ? "Y"
@@ -407,7 +414,7 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
                 ? "N"
                 : null) as "Y" | "N" | "NA" | null,
       }))
-      .filter((d): d is { documentNumber: number; value: "Y" | "N" | "NA" } => d.value !== null);
+      .filter((d): d is { documentKey: string; value: "Y" | "N" | "NA" } => d.value !== null);
 
     const assigned = awaiting ? chance(0.3) : status !== "RECEIVED" || chance(0.6);
     const releasedOn = released
@@ -437,14 +444,13 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
         address: `${Math.floor(between(1, 200))} ${pick(PLACES)} Road, ${lga}`,
         principalLga: lga,
         otherAreasServed: chance(0.2) ? pick(lgas).name : null,
+        formFiled: formCodeFor(pricing.category),
         primaryActivityCode: code,
-        secondaryActivityCode: secondary?.code ?? null,
         installedCapacityMw: capacity,
         customers: Math.floor(between(0, 20_000)),
         licenceStatus,
-        licenceNo: held ? `LIC/${Math.floor(between(1000, 9999))}` : null,
-        licenceExpiry:
-          held && chance(0.6) ? fromIsoDate(addDays(today, Math.floor(between(-30, 900)))) : null,
+        holdsAnyLicence: held,
+        multiStateLicensee: licenceStatus === "NERC licence (multi-State)",
         complianceOfficer: "Fake Compliance Officer",
         phone: `080${Math.floor(between(10_000_000, 99_999_999))}`,
         email: `compliance${i}@fake.example`,
@@ -483,6 +489,17 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
         reviewDate: decision === "REGISTER" ? fromIsoDate(certDate) : null,
       },
       documents,
+      otherActivityCode: secondary && secondary.code !== code ? secondary.code : null,
+      licence: held
+        ? {
+            sortOrder: 1,
+            type: licenceStatus,
+            number: `LIC/${Math.floor(between(1000, 9999))}`,
+            expiryDate: chance(0.6)
+              ? fromIsoDate(addDays(today, Math.floor(between(-30, 900))))
+              : null,
+          }
+        : null,
       payments,
       notice: noticeOn
         ? {
@@ -552,6 +569,24 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
             r.payments.map((p) => ({ ...p, submissionId: idOf.get(r.submission.ackNo)! })),
           ),
         });
+        await tx.submissionActivity.createMany({
+          data: chunk.flatMap((r) =>
+            r.otherActivityCode
+              ? [
+                  {
+                    submissionId: idOf.get(r.submission.ackNo)!,
+                    activityCode: r.otherActivityCode,
+                    sortOrder: 1,
+                  },
+                ]
+              : [],
+          ),
+        });
+        await tx.submissionLicence.createMany({
+          data: chunk.flatMap((r) =>
+            r.licence ? [{ ...r.licence, submissionId: idOf.get(r.submission.ackNo)! }] : [],
+          ),
+        });
         await tx.deficiencyNotice.createMany({
           data: chunk.flatMap((r) =>
             r.notice ? [{ ...r.notice, submissionId: idOf.get(r.submission.ackNo)! }] : [],
@@ -579,8 +614,17 @@ export async function generateFakeData(db: PrismaClient, opts: FakeOptions) {
           LGA_WEIGHTS,
           lgas.map((l) => l.name),
         ),
-        installedCapacityKw: kw,
-        fuel: pick(["Gas", "Diesel", "Solar PV", "Hybrid"]),
+        siteAddress: `Plot ${Math.floor(between(1, 400))}, ${pick(PLACES)} Industrial Estate`,
+        units: {
+          create: [
+            {
+              sortOrder: 1,
+              makeModel: "Fake generator",
+              capacityKw: kw,
+              fuel: pick(["Gas", "Diesel", "Solar PV", "Hybrid"]),
+            },
+          ],
+        },
         pricedFee: BigInt(pricing.fee),
         pricedThresholdKw: pricing.thresholdKw,
         createdById: staff["Fake Registry"]!,

@@ -1,4 +1,5 @@
 import type { Settings as SettingsRow } from "@prisma/client";
+import type { ConditionKey, RegistrationFormDef } from "@/domain/forms";
 import type { ReferenceData, Settings } from "@/domain/reference";
 import type { IsoDate } from "@/domain/types";
 import type { Db, Tx } from "./types";
@@ -54,6 +55,7 @@ export function settingsFromRow(row: SettingsRow): Settings {
     chairmanName: row.chairmanName,
     commissionerName: row.commissionerName,
     feesRevisedOn: toIsoDate(row.feesRevisedOn),
+    annualConfirmationDue: row.annualConfirmationDue,
     policy: {
       lateChargeBlocksCompleteness: row.lateChargeBlocksCompleteness,
       waiverAppliesToLateCharge: row.waiverAppliesToLateCharge,
@@ -61,6 +63,11 @@ export function settingsFromRow(row: SettingsRow): Settings {
       tinPattern: row.tinPattern,
       lateChargeRequiredForRelease: row.lateChargeRequiredForRelease,
       unpaidReminderDays: row.unpaidReminderDays,
+      supplyRetailCategory1MwPlus: row.supplyRetailCategory1MwPlus,
+      wrongFormHandling: row.wrongFormHandling,
+      otherActivitiesRequireDocuments: row.otherActivitiesRequireDocs,
+      ownUseCertificate: row.ownUseCertificate,
+      filingFeeOnUpdates: row.filingFeeOnUpdates,
     },
   };
 }
@@ -85,12 +92,18 @@ export function settingsToRow(s: Settings): Omit<SettingsRow, "id" | "updatedAt"
     chairmanName: s.chairmanName,
     commissionerName: s.commissionerName,
     feesRevisedOn: fromIsoDate(s.feesRevisedOn),
+    annualConfirmationDue: s.annualConfirmationDue,
     lateChargeBlocksCompleteness: s.policy.lateChargeBlocksCompleteness,
     waiverAppliesToLateCharge: s.policy.waiverAppliesToLateCharge,
     flagsBlockApproval: s.policy.flagsBlockApproval,
     tinPattern: s.policy.tinPattern,
     lateChargeRequiredForRelease: s.policy.lateChargeRequiredForRelease,
     unpaidReminderDays: s.policy.unpaidReminderDays,
+    supplyRetailCategory1MwPlus: s.policy.supplyRetailCategory1MwPlus,
+    wrongFormHandling: s.policy.wrongFormHandling,
+    otherActivitiesRequireDocs: s.policy.otherActivitiesRequireDocuments,
+    ownUseCertificate: s.policy.ownUseCertificate,
+    filingFeeOnUpdates: s.policy.filingFeeOnUpdates,
   };
 }
 
@@ -101,10 +114,13 @@ export async function loadSettings(db: Db | Tx): Promise<Settings> {
 }
 
 export async function loadReferenceData(db: Db | Tx): Promise<ReferenceData> {
-  const [fees, activities, documents, checks] = await Promise.all([
+  const [fees, activities, forms, checks] = await Promise.all([
     db.feeCategory.findMany({ orderBy: { category: "asc" } }),
     db.activity.findMany({ orderBy: { sortOrder: "asc" } }),
-    db.schedule2Document.findMany({ orderBy: { number: "asc" } }),
+    db.registrationForm.findMany({
+      orderBy: { sortOrder: "asc" },
+      include: { documents: { orderBy: { sortOrder: "asc" } } },
+    }),
     db.evaluationCheck.findMany({ orderBy: { sortOrder: "asc" } }),
   ]);
   return {
@@ -125,7 +141,17 @@ export async function loadReferenceData(db: Db | Tx): Promise<ReferenceData> {
       catBelow1Mw: a.catBelow1Mw,
       capacityBased: a.capacityBased,
     })),
-    schedule2Documents: documents.map((d) => d.name),
+    forms: forms.map((f): RegistrationFormDef => ({
+      form: f.form,
+      category: f.category,
+      title: f.title,
+      para: f.para,
+      documents: f.documents.map((d) => ({
+        key: d.key,
+        text: d.text,
+        requiredWhen: d.requiredWhen as ConditionKey | null,
+      })),
+    })),
     evaluationChecks: checks.map((c) => ({ id: c.id, stage: c.stage, text: c.text })),
   };
 }

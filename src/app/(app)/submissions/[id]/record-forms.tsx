@@ -2,8 +2,10 @@
 
 import { useActionState } from "react";
 import { Field, FormMessage, SubmitButton, inputClass } from "@/components/form";
+import type { DocumentItem } from "@/domain/documents";
 import type { CheckValue } from "@/domain/types";
 import type { ActionState } from "@/lib/action";
+import { documentStatusText as automaticNote } from "@/lib/format";
 
 type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
 
@@ -14,14 +16,14 @@ const CHOICES: { value: Exclude<CheckValue, null> | ""; label: string }[] = [
   { value: "", label: "Pending" },
 ];
 
-/** Schedule 2 checklist: one radio group per document. */
+/** The form's Schedule 2 checklist: one radio group per document set by hand. */
 export function DocumentsForm({
   action,
   documents,
   closedStatus,
 }: {
   action: Action;
-  documents: { number: number; name: string; value: CheckValue }[];
+  documents: DocumentItem[];
   /** Set for a closed submission: Admin only, with a reason. */
   closedStatus?: string;
 }) {
@@ -42,19 +44,30 @@ export function DocumentsForm({
         </thead>
         <tbody className="divide-y divide-gray-100">
           {documents.map((d) => (
-            <tr key={d.number}>
-              <td className="py-1.5 pr-2">{d.name}</td>
-              {CHOICES.map((c) => (
-                <td key={c.label} className="px-1 text-center">
-                  <input
-                    type="radio"
-                    name={`doc-${d.number}`}
-                    value={c.value}
-                    defaultChecked={(d.value ?? "") === c.value}
-                    aria-label={`${d.name}: ${c.label}`}
-                  />
+            <tr key={d.key}>
+              <td className="py-1.5 pr-2">
+                {d.text}
+                {d.requiredWhen && d.mode === "manual" && (
+                  <span className="block text-xs text-gray-500">If it applies</span>
+                )}
+              </td>
+              {d.mode === "manual" ? (
+                CHOICES.map((c) => (
+                  <td key={c.label} className="px-1 text-center">
+                    <input
+                      type="radio"
+                      name={`doc-${d.key}`}
+                      value={c.value}
+                      defaultChecked={(d.value ?? "") === c.value}
+                      aria-label={`${d.text}: ${c.label}`}
+                    />
+                  </td>
+                ))
+              ) : (
+                <td colSpan={CHOICES.length} className="px-1 text-center text-xs text-gray-600">
+                  {automaticNote(d)}
                 </td>
-              ))}
+              )}
             </tr>
           ))}
         </tbody>

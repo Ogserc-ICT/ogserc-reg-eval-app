@@ -2,7 +2,7 @@ import { certificateDateParts } from "./dates";
 import { certificateSerial } from "./numbers";
 import type { Settings } from "./reference";
 import type { Assessment } from "./submission";
-import { LICENCE, STATUS, type SubmissionInput } from "./types";
+import { LICENCE, STATUS, type LicenceInput, type SubmissionInput } from "./types";
 import { signatoriesMissing } from "./workflow";
 
 /** CERT-01 merge fields (SPEC §7). */
@@ -40,10 +40,32 @@ export function certificateBlockers(
   return reasons;
 }
 
-/** Licence line: none held → "None — application pending"; else the status and number if any. */
-export function licenceText(licenceStatus: string | null, licenceNo: string | null): string {
+/**
+ * Licence line: none held → "None — application pending"; else the status and the number of every
+ * licence in the table, if any.
+ */
+export function licenceText(
+  licenceStatus: string | null,
+  licences: readonly LicenceInput[],
+): string {
   if (!licenceStatus || licenceStatus === LICENCE.UNLICENSED) return "None — application pending";
-  return licenceNo?.trim() ? `${licenceStatus}, No. ${licenceNo.trim()}` : licenceStatus;
+  const numbers = licences.map((l) => l.number?.trim()).filter(Boolean);
+  return numbers.length ? `${licenceStatus}, No. ${numbers.join(", ")}` : licenceStatus;
+}
+
+/**
+ * Principal LGA and service area: the principal LGA, the other LGAs served, then the towns,
+ * communities or estates, e.g. "Ifo, Ewekoro, Sagamu; Agbara estate".
+ */
+export function serviceAreaText(
+  sub: Pick<SubmissionInput, "principalLga" | "lgasServed" | "otherAreasServed">,
+): string {
+  const lgas = [sub.principalLga, ...sub.lgasServed.filter((l) => l !== sub.principalLga)].filter(
+    Boolean,
+  );
+  const other = sub.otherAreasServed?.trim();
+  const text = lgas.join(", ");
+  return other ? (text ? `${text}; ${other}` : other) : text || "—";
 }
 
 /** SPEC §7 field mapping. Call only when `certificateBlockers` is empty. */
@@ -54,7 +76,6 @@ export function certificateFields(
 ): CertificateFields {
   const regNo = sub.registrationNo!;
   const date = certificateDateParts(sub.certificateIssueDate!);
-  const other = sub.otherAreasServed?.trim();
   return {
     SERIAL: certificateSerial(regNo),
     REG_NO: regNo,
@@ -63,9 +84,9 @@ export function certificateFields(
     ADDRESS: sub.address?.trim() || "—",
     CATEGORY: `${a.categoryApplied} — ${a.categoryDescription ?? ""}`.trim(),
     ACTIVITY: sub.primaryActivity ?? "—",
-    OTHER: sub.secondaryActivity?.trim() || "None",
-    AREA: other ? `${sub.principalLga}; ${other}` : (sub.principalLga ?? "—"),
-    LICENCE: licenceText(sub.licenceStatus, sub.licenceNo),
+    OTHER: sub.otherActivities.length ? sub.otherActivities.join("; ") : "None",
+    AREA: serviceAreaText(sub),
+    LICENCE: licenceText(sub.licenceStatus, sub.licences),
     DAY: date.day,
     MONTH: date.month,
     YEAR: date.year,

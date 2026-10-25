@@ -56,12 +56,12 @@ const form = (o: Record<string, string> = {}) => ({
   principalLga: "Ifo",
   otherAreasServed: "",
   primaryActivityCode: "MGD",
-  secondaryActivityCode: "",
+  filingType: "NEW",
+  formFiled: "REG-01E",
   installedCapacityMw: "2.5",
   customers: "",
   licenceStatus: "NERC registration/permit (mini-grid/captive)",
-  licenceNo: "NERC/MG/1",
-  licenceExpiry: "",
+  licences: [{ number: "NERC/MG/1" }],
   complianceOfficer: "",
   phone: "",
   email: "",
@@ -350,7 +350,7 @@ describe("existing records (data migration)", () => {
     });
     await pay(received.ackNo, "250000"); // pending: does not save it
     await confirm((await pay(confirmedOne.ackNo, "250000")).id);
-    await updateDocuments(db, registry, received.id, { "1": "Y" });
+    await updateDocuments(db, registry, received.id, { incorporation: "Y" });
 
     const url = inject("databaseUrl");
     const dryRun = execSync("npx tsx scripts/finance-gate-dry-run.ts", {

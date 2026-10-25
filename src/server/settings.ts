@@ -26,6 +26,11 @@ export async function updateSettings(db: Db, actor: Actor, input: unknown) {
     tinPattern,
     lateChargeRequiredForRelease,
     unpaidReminderDays,
+    supplyRetailCategory1MwPlus,
+    wrongFormHandling,
+    otherActivitiesRequireDocuments,
+    ownUseCertificate,
+    filingFeeOnUpdates,
     ...rest
   } = parsed.data;
 
@@ -41,6 +46,11 @@ export async function updateSettings(db: Db, actor: Actor, input: unknown) {
         tinPattern,
         lateChargeRequiredForRelease,
         unpaidReminderDays,
+        supplyRetailCategory1MwPlus,
+        wrongFormHandling,
+        otherActivitiesRequireDocuments,
+        ownUseCertificate,
+        filingFeeOnUpdates,
       },
     });
 

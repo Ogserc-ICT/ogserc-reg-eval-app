@@ -29,3 +29,8 @@ export function appBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
 export function verificationUrl(submissionId: string): string {
   return `${appBaseUrl()}/verify/${submissionId}`;
 }
+
+/** The same for an own-use notification's certificate (setting "own-use certificate"). */
+export function ownUseVerificationUrl(ownUseNotificationId: string): string {
+  return `${appBaseUrl()}/verify/own-use/${ownUseNotificationId}`;
+}

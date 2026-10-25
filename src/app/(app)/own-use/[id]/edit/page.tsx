@@ -11,7 +11,10 @@ export default async function EditOwnUsePage({ params }: { params: Promise<{ id:
   await requirePermission("ownUse.create");
   const { id } = await params;
   const [row, options, settings] = await Promise.all([
-    db.ownUseNotification.findUnique({ where: { id } }),
+    db.ownUseNotification.findUnique({
+      where: { id },
+      include: { units: { orderBy: { sortOrder: "asc" } } },
+    }),
     loadFormOptions(db),
     loadSettings(db),
   ]);
@@ -26,10 +29,14 @@ export default async function EditOwnUsePage({ params }: { params: Promise<{ id:
     natureOfBusiness: s(row.natureOfBusiness),
     gridConnected: row.gridConnected === null ? "" : row.gridConnected ? "Y" : "N",
     distributionLicensee: s(row.distributionLicensee),
-    units: row.units?.toString() ?? "",
-    installedCapacityKw: row.installedCapacityKw.toString(),
-    fuel: s(row.fuel),
-    avgMonthlyOutputMwh: row.avgMonthlyOutputMwh?.toString() ?? "",
+    units: JSON.stringify(
+      row.units.map((u) => ({
+        makeModel: s(u.makeModel),
+        capacityKw: u.capacityKw.toString(),
+        fuel: s(u.fuel),
+        avgMonthlyMwh: u.avgMonthlyMwh?.toString() ?? "",
+      })),
+    ),
     contactPerson: s(row.contactPerson),
     phone: s(row.phone),
     email: s(row.email),

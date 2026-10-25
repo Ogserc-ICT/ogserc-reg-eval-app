@@ -1,3 +1,4 @@
+import { formsFromSeed, type RegistrationFormDef } from "./forms";
 import { nairaToKobo } from "./money";
 import type { IsoDate, Kobo } from "./types";
 
@@ -32,9 +33,13 @@ export interface EvaluationCheckDef {
 export interface ReferenceData {
   fees: FeeRow[];
   activities: Activity[];
-  schedule2Documents: string[];
+  /** REG-01A to REG-01K with their Schedule 2 document lists (registration-forms.json). */
+  forms: RegistrationFormDef[];
   evaluationChecks: EvaluationCheckDef[];
 }
+
+/** How a submission filed on the wrong form is handled (open policy point; default ACCEPT). */
+export type WrongFormHandling = "ACCEPT" | "REQUIRE_CORRECT_FORM";
 
 /**
  * Commission policy choices on SPEC §9 open questions. Defaults follow the Excel
@@ -59,6 +64,23 @@ export interface Policy {
    * queue (undecided policy; default null = no reminder, no automatic action).
    */
   unpaidReminderDays: number | null;
+  /**
+   * Category for Supply / retail (SUP) at 1 MW or more (open policy point; default K, as the
+   * activity map has it). Below 1 MW the activity map applies.
+   */
+  supplyRetailCategory1MwPlus: string;
+  /**
+   * ACCEPT: a submission on the wrong form is accepted and re-categorised when the evaluator
+   * confirms the category with a reason. REQUIRE_CORRECT_FORM: the mismatch fails check 1.10, so the
+   * applicant is asked (by deficiency notice) to file on the right form.
+   */
+  wrongFormHandling: WrongFormHandling;
+  /** Other activities ticked also require their own form's documents (default off). */
+  otherActivitiesRequireDocuments: boolean;
+  /** Own-use notifications (REG-01I) can be registered with a certificate (default off). */
+  ownUseCertificate: boolean;
+  /** Updates and annual confirmations pay the category's registration fee (default off: no fee). */
+  filingFeeOnUpdates: boolean;
 }
 
 export interface Settings {
@@ -81,6 +103,8 @@ export interface Settings {
   chairmanName: string;
   commissionerName: string;
   feesRevisedOn: IsoDate | null;
+  /** Annual confirmation due date each year, "MM-DD" (para 16(2): 31 January). */
+  annualConfirmationDue: string;
   policy: Policy;
 }
 
@@ -91,6 +115,11 @@ export const DEFAULT_POLICY: Policy = {
   tinPattern: null,
   lateChargeRequiredForRelease: false,
   unpaidReminderDays: null,
+  supplyRetailCategory1MwPlus: "K",
+  wrongFormHandling: "ACCEPT",
+  otherActivitiesRequireDocuments: false,
+  ownUseCertificate: false,
+  filingFeeOnUpdates: false,
 };
 
 // Shape of seed-data.json (only the parts read here).
@@ -113,11 +142,13 @@ interface SeedFile {
     cat_below_1mw: string;
     capacity_based: boolean;
   }[];
-  schedule2_documents: string[];
   evaluation_checks: EvaluationCheckDef[];
 }
 
-export function referenceDataFromSeed(seed: SeedFile): ReferenceData {
+export function referenceDataFromSeed(
+  seed: SeedFile,
+  formsFile: Parameters<typeof formsFromSeed>[0],
+): ReferenceData {
   return {
     fees: seed.schedule3_fees.map((f) => ({
       category: f.category,
@@ -136,7 +167,7 @@ export function referenceDataFromSeed(seed: SeedFile): ReferenceData {
       catBelow1Mw: a.cat_below_1mw,
       capacityBased: a.capacity_based,
     })),
-    schedule2Documents: seed.schedule2_documents,
+    forms: formsFromSeed(formsFile),
     evaluationChecks: seed.evaluation_checks,
   };
 }
@@ -173,6 +204,7 @@ export function settingsFromSeed(seed: SeedFile): Settings {
     commissionerName: str("Signatory: Commissioner"),
     // §8.9: the workbook disagrees with itself (20 vs 21 Oct); left for an admin to set once.
     feesRevisedOn: null,
+    annualConfirmationDue: "01-31",
     policy: { ...DEFAULT_POLICY },
   };
 }

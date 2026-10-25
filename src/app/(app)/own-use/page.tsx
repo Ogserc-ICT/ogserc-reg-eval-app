@@ -26,7 +26,7 @@ export default async function OwnUsePage({
 
   return (
     <div>
-      <PageHeader title="Own-use notifications (OUN-01)">
+      <PageHeader title="Own-use notifications (Form REG-01I)">
         {can(user.roles, "ownUse.create") && (
           <Link
             href="/own-use/new"
@@ -90,7 +90,7 @@ export default async function OwnUsePage({
                   <td className="px-2 py-1.5">{row.lga}</td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{showDate(input.dateFiled)}</td>
                   <td className="px-2 py-1.5 text-right">
-                    {input.installedCapacityKw?.toLocaleString("en-NG")}
+                    {a.installedCapacityKw?.toLocaleString("en-NG")}
                   </td>
                   <td className="px-2 py-1.5">{a.eligibility}</td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">

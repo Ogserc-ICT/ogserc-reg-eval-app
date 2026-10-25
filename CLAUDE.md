@@ -6,7 +6,8 @@ Internal web app for Ogun State Electricity Regulatory Commission (OGSERC) staff
 - `docs/SPEC.md`: every business rule, workflow transition, number format and test fixture. **Read it before changing any domain logic.** If code and spec disagree, the spec wins. If the spec is unclear, ask; do not guess.
 - `docs/TEMPLATES.md`: wording for the letters and the certificate.
 - `docs/DECISIONS.md`: decisions made during the build that refine the spec (snapshot pricing, login throttling, payment reversals, deferrals). Read it with the spec; it wins where they differ.
-- `seed-data.json`: fee table, activity→category map, LGAs, lists, Schedule 2 documents, all 62 evaluation checks. Seed from this file; never hard-code these values in components.
+- `seed-data.json`: fee table, activity→category map, LGAs, lists, all 63 evaluation checks (and the old 13-item Schedule 2 list, kept only for the workbook import and migration). Seed from this file; never hard-code these values in components.
+- `registration-forms.json`: the 11 category forms REG-01A to REG-01K, each with its Schedule 2 document list (shared keys, `required_when` conditions). Seeded like `seed-data.json`. The Word forms are in `reference/forms/`.
 - `reference/*.xlsm`: the original workbook, for cross-checking only. It has known bugs (SPEC §8); do not copy its behaviour where the spec says otherwise.
 - `assets/`: logo, certificate security background (2338×1654 PNG, A4 landscape), original Word certificate template (layout reference only).
 
