@@ -2,6 +2,8 @@
 import type { Prisma } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import forms from "../../registration-forms.json";
+import technical from "../../technical-sections.json";
+import type { TechnicalDefs } from "@/domain/technical";
 import seed from "../../seed-data.json";
 import { referenceDataFromSeed, settingsFromSeed } from "@/domain/reference";
 import { COUNTER, nextCounter } from "@/server/counters";
@@ -29,7 +31,9 @@ describe("seed", () => {
   });
 
   it("round-trips to exactly the domain data built from seed-data.json", async () => {
-    expect(await loadReferenceData(db)).toEqual(referenceDataFromSeed(seed, forms));
+    expect(await loadReferenceData(db)).toEqual(
+      referenceDataFromSeed(seed, forms, { forms: technical.forms as unknown as TechnicalDefs }),
+    );
     expect(await loadSettings(db)).toEqual(settingsFromSeed(seed));
   });
 

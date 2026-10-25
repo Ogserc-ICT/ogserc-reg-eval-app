@@ -1,6 +1,9 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
 import formsFile from "../../registration-forms.json";
-import { PAYMENT_EVIDENCE_KEY } from "@/domain/forms";
+import { PAYMENT_EVIDENCE_KEY, type ConditionKey } from "@/domain/forms";
+import { derivedConditions } from "@/domain/technical";
+import { TECHNICAL_DEFS } from "@/server/reference-data";
+import { answeredTechnical } from "../../src/domain/__tests__/helpers";
 import { inject } from "vitest";
 import type { Role } from "@/domain/roles";
 import { formatAckNo } from "@/domain/numbers";
@@ -134,12 +137,19 @@ export async function confirmPayments(db: PrismaClient, reference: string, today
   return finance;
 }
 
-/** A form's checklist (every item staff set by hand) with one value, for updateDocuments. */
+/**
+ * A form's checklist with one value, for updateDocuments: every item staff set by hand, leaving out
+ * evidence of payment and the items the standard answers (`technicalAnswers`) make N/A.
+ */
 export function formDocuments(form = "REG-01E", value = "Y"): Record<string, string> {
   const def = formsFile.forms.find((f) => f.form === form);
   if (!def) throw new Error(`No form ${form}`);
+  const decided = derivedConditions(TECHNICAL_DEFS, answeredTechnical(form, 1), [form]);
   return Object.fromEntries(
-    def.documents.filter((d) => d.key !== PAYMENT_EVIDENCE_KEY).map((d) => [d.key, value]),
+    def.documents
+      .filter((d) => d.key !== PAYMENT_EVIDENCE_KEY)
+      .filter((d) => !("required_when" in d) || decided[d.required_when as ConditionKey] !== "N")
+      .map((d) => [d.key, value]),
   );
 }
 
@@ -159,4 +169,9 @@ export async function confirmFormCategory(
     { category: row.formFiled.slice(-1), reason: "" },
     { today },
   );
+}
+
+/** Every category-specific section of a form answered, stating `capacityMw` (as the form posts it). */
+export function technicalAnswers(form: string, capacityMw: number): string {
+  return JSON.stringify(answeredTechnical(form, capacityMw));
 }

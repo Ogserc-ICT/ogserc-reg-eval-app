@@ -351,6 +351,10 @@ model Submission {
   gDiscoBulkSupply       Boolean?
   subFranchise           Boolean?
 
+  /// Answers to the category-specific sections, by form (technical-sections.json), validated by
+  /// src/domain/technical.ts. Money in kobo; other numbers in the unit printed on the form.
+  technicalData Json @default("{}")
+
   operatingOnEffectiveDate Boolean
   plannedStartDate         DateTime? @db.Date
 

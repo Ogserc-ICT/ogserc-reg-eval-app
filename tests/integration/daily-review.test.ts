@@ -4,9 +4,14 @@ import { runDailyReview } from "@/server/daily-review";
 import { createSubmission } from "@/server/intake";
 import { fromIsoDate } from "@/server/reference-data";
 import type { Actor } from "@/server/types";
-import { asWorkflow, makeUser, resetDb, testDb } from "./helpers";
+import { asWorkflow, makeUser, resetDb, testDb, technicalAnswers } from "./helpers";
 
 const db = testDb();
+
+/** REG-01E's category-specific sections answered, at each capacity these tests use. */
+const TECHNICAL: Record<string, string> = {
+  "2": technicalAnswers("REG-01E", 2),
+};
 afterAll(() => db.$disconnect());
 
 let registry: Actor, supervisor: Actor, evaluator: Actor, admin: Actor;
@@ -32,6 +37,7 @@ const form = (name: string, cac: string) => ({
   primaryActivityCode: "MGD",
   filingType: "NEW",
   formFiled: "REG-01E",
+  technicalData: TECHNICAL["2"],
   installedCapacityMw: "2",
   customers: "",
   licenceStatus: "NERC registration/permit (mini-grid/captive)",

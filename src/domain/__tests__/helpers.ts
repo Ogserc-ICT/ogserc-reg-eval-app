@@ -1,4 +1,5 @@
 import formsFile from "../../../registration-forms.json";
+import technicalFile from "../../../technical-sections.json";
 import seed from "../../../seed-data.json";
 import { categoryApplied, categoryAuto } from "../category";
 import { addDays } from "../dates";
@@ -17,9 +18,12 @@ import {
   type PaymentInput,
   type SubmissionInput,
 } from "../types";
+import type { Cell, FieldValue, TechField, TechnicalData, TechnicalDefs } from "../technical";
 import type { ApprovalInput } from "../workflow";
 
-export const ref = referenceDataFromSeed(seed, formsFile);
+export const ref = referenceDataFromSeed(seed, formsFile, {
+  forms: technicalFile.forms as unknown as TechnicalDefs,
+});
 export const settings = settingsFromSeed(seed);
 /** Effective Date placeholder from the seed: 2026-10-22. */
 export const ED = settings.effectiveDate;
@@ -81,18 +85,68 @@ export function other(overrides: Partial<OtherSubmission> & { id: string }): Oth
   };
 }
 
+/** A plausible answer to every field of a form's sections, stating `capacityMw` where asked. */
+export function answeredTechnical(form: string, capacityMw: number | null): TechnicalData {
+  const def = ref.technical[form];
+  if (!def) return {};
+  const cell = (
+    type: string,
+    capacity: "MW" | "kW" | undefined,
+    options?: { value: string }[],
+  ): Cell => {
+    if (capacity) return capacity === "kW" ? (capacityMw ?? 0) * 1000 : (capacityMw ?? 0);
+    if (type === "select" || type === "choice") return options![0]!.value;
+    if (type === "number" || type === "integer" || type === "money") return 1;
+    if (type === "date") return ED;
+    return "x";
+  };
+  const value = (f: TechField): FieldValue => {
+    if (f.type === "checks") return [f.options![0]!.value];
+    if (f.type === "table") {
+      return [
+        Object.fromEntries(f.columns!.map((c) => [c.key, cell(c.type, c.capacity, c.options)])),
+      ];
+    }
+    if (f.type === "grid") {
+      const r = f.rows![0]!;
+      return {
+        [r.key]: Object.fromEntries(
+          f.columns!.map((c) => [c.key, cell(c.type, undefined, c.options)]),
+        ),
+      };
+    }
+    return cell(f.type, f.capacity, f.options);
+  };
+  return {
+    [form]: {
+      notApplicable: [],
+      sections: Object.fromEntries(
+        def.sections.map((sec) => [
+          sec.key,
+          Object.fromEntries(sec.fields.map((f) => [f.key, value(f)])),
+        ]),
+      ),
+    },
+  };
+}
+
 /**
- * A submission, by default filed on the right form for its category and with that category
- * confirmed by the evaluator (as a ready submission would be). Override `formFiled` or
- * `confirmedCategory` to test anything else.
+ * A submission, by default filed on the right form for its category, with that category confirmed
+ * by the evaluator and the form's own sections answered (as a ready submission would be). Override
+ * `formFiled`, `confirmedCategory` or `technicalData` to test anything else.
  */
 export function makeSubmission(overrides: Partial<SubmissionInput> = {}): SubmissionInput {
   const sub = makeRawSubmission(overrides);
   const category = categoryApplied(sub.categoryOverride, categoryAuto(sub, ref, settings.policy));
+  const formFiled = "formFiled" in overrides ? sub.formFiled : category && formCodeFor(category);
   return {
     ...sub,
-    formFiled: "formFiled" in overrides ? sub.formFiled : category && formCodeFor(category),
+    formFiled,
     confirmedCategory: "confirmedCategory" in overrides ? sub.confirmedCategory : category,
+    technicalData:
+      "technicalData" in overrides
+        ? sub.technicalData
+        : answeredTechnical(formFiled ?? "", sub.installedCapacityMw),
   };
 }
 
@@ -137,6 +191,7 @@ function makeRawSubmission(overrides: Partial<SubmissionInput>): SubmissionInput
     remarks: null,
     documents: {},
     conditions: { ...NO_CONDITIONS },
+    technicalData: {},
     pricing: null,
     // Released for evaluation (Finance-confirmed) unless a test says otherwise (§4.12).
     releasedForEvaluationDate: ED,

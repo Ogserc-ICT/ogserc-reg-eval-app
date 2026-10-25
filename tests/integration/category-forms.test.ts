@@ -28,9 +28,21 @@ import {
   saveChecks,
 } from "@/server/workflow";
 import { getOwnUseVerification } from "@/server/verify";
-import { confirmPayments, formDocuments, makeUser, resetDb, testDb } from "./helpers";
+import {
+  confirmPayments,
+  formDocuments,
+  makeUser,
+  resetDb,
+  testDb,
+  technicalAnswers,
+} from "./helpers";
 
 const db = testDb();
+
+/** REG-01E's category-specific sections answered, at each capacity these tests use. */
+const TECHNICAL: Record<string, string> = {
+  "2.5": technicalAnswers("REG-01E", 2.5),
+};
 afterAll(() => db.$disconnect());
 
 const TODAY = "2026-10-22";
@@ -59,6 +71,7 @@ const intake = (o: Record<string, unknown> = {}) => {
   return {
     filingType: "NEW",
     formFiled: "REG-01E",
+    technicalData: TECHNICAL["2.5"],
     linkedRegistrationNo: "",
     registeredName: `Registrant ${seq} Ltd`,
     dateSubmitted: TODAY,
@@ -588,6 +601,123 @@ describe("own-use (REG-01I) documents and certificate", () => {
     await createOwnUse(db, registry, oun());
     await expect(createOwnUse(db, registry, oun())).rejects.toBeInstanceOf(
       ConfirmationRequiredError,
+    );
+  });
+});
+
+describe("category-specific sections (part 2)", () => {
+  /** REG-01D answers as the form posts them (text), for a 5 MW captive plant. */
+  const captive = (installed = "5") =>
+    JSON.stringify({
+      "REG-01D": {
+        notApplicable: ["operations"],
+        sections: {
+          generation_activity: { activity: ["captive"], total_mw: installed, cod: "2024" },
+          generating_plant: { plant: [{ unit: "GT1", installed, fuel: "Gas" }] },
+          grid_offtake: {
+            network: "none",
+            offtakers: [{ offtaker: "Own use", type: "own_use", contracted_mw: installed }],
+          },
+        },
+      },
+    });
+  const gen = (o: Record<string, unknown> = {}) =>
+    intake({
+      formFiled: "REG-01D",
+      primaryActivityCode: "GEN",
+      installedCapacityMw: "5",
+      technicalData: captive(),
+      ...o,
+    });
+
+  it("stores the answers typed, and they decide the checklist and the flags", async () => {
+    const sub = await createSubmission(db, registry, gen(), { today: TODAY });
+    const stored = await db.submission.findUniqueOrThrow({ where: { id: sub.id } });
+    expect(stored.technicalData).toMatchObject({
+      "REG-01D": {
+        notApplicable: ["operations"],
+        sections: { generation_activity: { activity: ["captive"], total_mw: 5 } },
+      },
+    });
+    const d = (await getSubmissionDetail(db, sub.id, TODAY))!;
+    const item = (k: string) => d.documents.find((x) => x.key === k);
+    // Captive only and not grid-connected: no offtake or connection agreement needed.
+    expect(item("ppa_offtake")?.mode).toBe("auto-na");
+    expect(item("connection_agreement")?.mode).toBe("auto-na");
+    expect(d.assessment.technical.forms[0]!.outstanding).toEqual([]);
+    expect(d.flags.map((f) => f.code)).not.toContain("TECHNICAL_INCOMPLETE");
+  });
+
+  it("refuses badly typed answers, saying where, and flags a capacity that does not match", async () => {
+    await expect(
+      createSubmission(db, registry, gen({ technicalData: captive("five") }), { today: TODAY }),
+    ).rejects.toMatchObject({
+      fieldErrors: {
+        technicalData: expect.arrayContaining([
+          "REG-01D Generating plant: Generating plant, row 1: Installed MW must be a number",
+        ]),
+      },
+    });
+    const sub = await createSubmission(db, registry, gen({ technicalData: captive("4") }), {
+      today: TODAY,
+    });
+    const d = (await getSubmissionDetail(db, sub.id, TODAY))!;
+    expect(d.flags.find((f) => f.code === "TECHNICAL_CAPACITY_MISMATCH")?.message).toContain(
+      "Installed capacity is 5 MW",
+    );
+  });
+
+  it("an approved update applies its changed answers to the registration", async () => {
+    const reg = await createSubmission(db, registry, intake({ cacNo: "RC7070" }), { today: TODAY });
+    await ready(reg.id, reg.ackNo);
+    const { registrationNo } = await approveAndRegister(
+      db,
+      approver,
+      reg.id,
+      { flagOverrideReason: "" },
+      { today: TODAY },
+    );
+    const before = (await db.submission.findUniqueOrThrow({ where: { id: reg.id } }))
+      .technicalData as Record<string, { sections: Record<string, Record<string, unknown>> }>;
+    const changed = structuredClone(before);
+    changed["REG-01E"]!.sections.minigrid_type!.grant = "REA, ₦20m, 2025";
+    const update = await createSubmission(
+      db,
+      registry,
+      intake({
+        filingType: "UPDATE",
+        linkedRegistrationNo: registrationNo,
+        registeredName: reg.registeredName,
+        cacNo: "RC7070",
+        technicalData: JSON.stringify(changed),
+      }),
+      { today: TODAY },
+    );
+    const pending = (await getSubmissionDetail(db, update.id, TODAY))!;
+    expect(pending.filingChanges?.map((c) => [c.label, c.after])).toEqual([
+      ["REG-01E Mini-grid type: Grant or subsidy programme, amount and year", "REA, ₦20m, 2025"],
+    ]);
+    await ready(update.id, update.ackNo, "");
+    await approveAndRegister(db, approver, update.id, { flagOverrideReason: "" }, { today: TODAY });
+    const after = (await db.submission.findUniqueOrThrow({ where: { id: reg.id } }))
+      .technicalData as typeof before;
+    expect(after["REG-01E"]!.sections.minigrid_type!.grant).toBe("REA, ₦20m, 2025");
+  });
+
+  it("audits each changed answer with its old and new value", async () => {
+    const sub = await createSubmission(db, registry, gen(), { today: TODAY });
+    await updateSubmission(
+      db,
+      registry,
+      sub.id,
+      gen({ registeredName: sub.registeredName, cacNo: sub.cacNo, technicalData: captive("5.5") }),
+    );
+    const [entry] = await audits("Submission updated");
+    expect(entry!.detail).toContain(
+      "REG-01D Generation activity: Total installed capacity at all sites (MW): 5 MW → 5.5 MW",
+    );
+    expect(entry!.detail).toContain(
+      "REG-01D Generating plant: Generating plant: GT1, Gas, 5 MW → GT1, Gas, 5.5 MW",
     );
   });
 });

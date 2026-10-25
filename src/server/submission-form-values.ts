@@ -1,7 +1,8 @@
 import type { Submission } from "@prisma/client";
 import { CONDITION_KEYS } from "@/domain/forms";
 import { CONDITION_FIELDS } from "@/lib/schemas";
-import { toIsoDate } from "./reference-data";
+import { technicalForEditing, type TechnicalData } from "@/domain/technical";
+import { TECHNICAL_DEFS, toIsoDate } from "./reference-data";
 import { CONDITION_COLUMNS } from "./submissions";
 import type { SubmissionWithChildren } from "./submission-text";
 
@@ -92,6 +93,9 @@ export function submissionFormValues(
     signatory2Date: d(r.signatory2Date),
     ...Object.fromEntries(
       CONDITION_KEYS.map((k) => [CONDITION_FIELDS[k], yn(r[CONDITION_COLUMNS[k]])]),
+    ),
+    technicalData: JSON.stringify(
+      technicalForEditing(TECHNICAL_DEFS, (r.technicalData ?? {}) as unknown as TechnicalData),
     ),
     operatingOnEffectiveDate: r.operatingOnEffectiveDate ? "Y" : "N",
     plannedStartDate: d(r.plannedStartDate),

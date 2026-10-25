@@ -2,6 +2,7 @@ import { overrideNeedsReason } from "./category";
 import { yearOf } from "./dates";
 import { annualConfirmationDue, licenceNeedsRenewal } from "./deadlines";
 import { formCodeFor } from "./forms";
+import { capacitiesAgree } from "./technical";
 import { findActivity } from "./reference";
 import type { Assessment, DomainContext } from "./submission";
 import {
@@ -317,6 +318,25 @@ export function dataFlags(
       "CONFIRMED_CATEGORY_NOT_CHARGED",
       `Category confirmed as ${sub.confirmedCategory} but Category ${charged} is charged – correct the activities or capacity, or override the category, then an admin recalculates`,
     );
+  }
+
+  // Category-specific sections (optional at intake; gaps and inconsistencies are flagged).
+  const own = a.technical.forms.find((f) => f.form === a.documentsForm);
+  if (own?.outstanding.length) {
+    add("TECHNICAL_INCOMPLETE", `${own.form} sections not complete: ${own.outstanding.join("; ")}`);
+  }
+  if (sub.installedCapacityMw !== null) {
+    const differ = a.technical.capacities.filter(
+      (c) => !capacitiesAgree(c.mw, sub.installedCapacityMw!),
+    );
+    if (differ.length) {
+      add(
+        "TECHNICAL_CAPACITY_MISMATCH",
+        `Installed capacity is ${sub.installedCapacityMw} MW, but ${differ
+          .map((c) => `${c.form} ${c.label} gives ${Number(c.mw.toFixed(3))} MW`)
+          .join("; ")}`,
+      );
+    }
   }
 
   // Updates and annual confirmations (para 16).

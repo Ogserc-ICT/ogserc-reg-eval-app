@@ -159,6 +159,7 @@ export function MultiCheckField({
   errors,
   hint,
   columns = 3,
+  onChange,
 }: {
   name: string;
   label: string;
@@ -168,6 +169,8 @@ export function MultiCheckField({
   errors?: Record<string, string[]>;
   hint?: React.ReactNode;
   columns?: number;
+  /** Told the ticked values after each change. */
+  onChange?: (values: string[]) => void;
 }) {
   const [ticked, setTicked] = useState<string[]>(() => {
     try {
@@ -177,12 +180,13 @@ export function MultiCheckField({
       return [];
     }
   });
-  const toggle = (value: string, on: boolean) =>
-    setTicked((t) =>
-      on
-        ? options.map((o) => o.value).filter((v) => v === value || t.includes(v))
-        : t.filter((v) => v !== value),
-    );
+  const toggle = (value: string, on: boolean) => {
+    const next = on
+      ? options.map((o) => o.value).filter((v) => v === value || ticked.includes(v))
+      : ticked.filter((v) => v !== value);
+    setTicked(next);
+    onChange?.(next);
+  };
   const messages = errors?.[name];
   return (
     <fieldset className="sm:col-span-2 lg:col-span-3">

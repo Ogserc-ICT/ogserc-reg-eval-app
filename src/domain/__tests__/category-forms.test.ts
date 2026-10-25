@@ -109,8 +109,13 @@ describe("document list of the form filed", () => {
   });
 
   it("makes a conditional item N/A automatically when its condition is N", () => {
+    // Stored yes/no answers apply while the technical sections do not decide them.
     const answered = (c: Partial<typeof NO_CONDITIONS>) =>
-      gen5({ conditions: { ...NO_CONDITIONS, ...c }, documents: { ppa_offtake: "Y" } });
+      gen5({
+        conditions: { ...NO_CONDITIONS, ...c },
+        documents: { ppa_offtake: "Y" },
+        technicalData: {},
+      });
     expect(itemOf(answered({ generation_for_sale: "N" }), "ppa_offtake")).toMatchObject({
       value: "N/A",
       mode: "auto-na",

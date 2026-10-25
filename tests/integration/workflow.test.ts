@@ -33,9 +33,16 @@ import {
   makeUser,
   resetDb,
   testDb,
+  technicalAnswers,
 } from "./helpers";
 
 const db = testDb();
+
+/** REG-01E's category-specific sections answered, at each capacity these tests use. */
+const TECHNICAL: Record<string, string> = {
+  "2": technicalAnswers("REG-01E", 2),
+  "2.5": technicalAnswers("REG-01E", 2.5),
+};
 afterAll(() => db.$disconnect());
 
 const TODAY = "2026-10-22";
@@ -78,6 +85,7 @@ async function newSubmission(overrides: Record<string, string> = {}) {
     primaryActivityCode: "MGD",
     filingType: "NEW",
     formFiled: "REG-01E",
+    technicalData: TECHNICAL["2.5"],
     installedCapacityMw: "2.5",
     customers: "",
     licenceStatus: "NERC registration/permit (mini-grid/captive)",
@@ -227,10 +235,10 @@ describe("markSubmissionComplete (§4.4)", () => {
     );
     expect(err).toBeInstanceOf(BlockedError);
     // The fee is confirmed (it had to be, to get here), so evidence of payment ticked itself; the
-    // other 12 REG-01E documents are outstanding.
+    // interconnection agreement is N/A (an isolated mini-grid); the other 11 are outstanding.
     expect(err.reasons.filter((r: string) => r.startsWith("Unpaid"))).toEqual([]);
     const outstanding = err.reasons.filter((r: string) => r.startsWith("Outstanding:"));
-    expect(outstanding).toHaveLength(12);
+    expect(outstanding).toHaveLength(11);
     expect(outstanding).not.toContain("Outstanding: Evidence of payment of the registration fee");
     expect(
       (await db.submission.findUniqueOrThrow({ where: { id: sub.id } })).dateSubmissionComplete,
@@ -260,7 +268,7 @@ describe("issueDeficiency (§4.5)", () => {
       status: "DEFICIENCY",
     });
     expect((await lastAudit()).detail).toMatch(
-      /^OGSERC\/DEF\/2026\/00001; response due 5 November 2026; 12 document\(s\) outstanding/,
+      /^OGSERC\/DEF\/2026\/00001; response due 5 November 2026; 11 document\(s\) outstanding/,
     );
     await expect(issueDeficiency(db, supervisor, sub.id, { today: TODAY })).rejects.toBeInstanceOf(
       BlockedError,
@@ -373,6 +381,7 @@ describe("approveAndRegister (§4.6)", () => {
       primaryActivityCode: "MGD",
       filingType: "NEW",
       formFiled: "REG-01E",
+      technicalData: TECHNICAL["2"],
       installedCapacityMw: "2",
       customers: "",
       licenceStatus: "NERC registration/permit (mini-grid/captive)",
@@ -693,6 +702,7 @@ describe("Registered records: certificate fields", () => {
       primaryActivityCode: "MGD",
       filingType: "NEW",
       formFiled: "REG-01E",
+      technicalData: TECHNICAL["2.5"],
       installedCapacityMw: "2.5",
       customers: "",
       licenceStatus: "NERC registration/permit (mini-grid/captive)",

@@ -1,4 +1,5 @@
 import { formsFromSeed, type RegistrationFormDef } from "./forms";
+import type { TechnicalDefs } from "./technical";
 import { nairaToKobo } from "./money";
 import type { IsoDate, Kobo } from "./types";
 
@@ -35,6 +36,8 @@ export interface ReferenceData {
   activities: Activity[];
   /** REG-01A to REG-01K with their Schedule 2 document lists (registration-forms.json). */
   forms: RegistrationFormDef[];
+  /** Category-specific sections of REG-01A to K (technical-sections.json). */
+  technical: TechnicalDefs;
   evaluationChecks: EvaluationCheckDef[];
 }
 
@@ -148,6 +151,7 @@ interface SeedFile {
 export function referenceDataFromSeed(
   seed: SeedFile,
   formsFile: Parameters<typeof formsFromSeed>[0],
+  technicalFile: { forms: TechnicalDefs },
 ): ReferenceData {
   return {
     fees: seed.schedule3_fees.map((f) => ({
@@ -168,6 +172,7 @@ export function referenceDataFromSeed(
       capacityBased: a.capacity_based,
     })),
     forms: formsFromSeed(formsFile),
+    technical: technicalFile.forms,
     evaluationChecks: seed.evaluation_checks,
   };
 }

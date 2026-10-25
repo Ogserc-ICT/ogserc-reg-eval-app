@@ -69,11 +69,21 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     await expect(page.getByLabel(/^Registered name/)).toHaveValue("Ogun Sunrise Mini-Grid Ltd");
 
     await fillSubmission(page, "Ogun Sunrise Mini-Grid Ltd", "RC 445566");
+    // Category-specific sections of REG-01E: optional, folded; answer part of one.
+    await page
+      .getByText("REG-01E — Mini-grids and interconnected mini-grids: category-specific sections")
+      .click();
+    await page.getByRole("checkbox", { name: "Isolated mini-grid" }).check();
+    await page.getByRole("button", { name: "+ Add row: Sites (one row per site)" }).click();
+    await page.getByLabel("Site / community, row 1").fill("Ilaro");
     await page.getByRole("button", { name: "Save submission" }).click();
 
     await expect(page.getByRole("heading", { name: "Ogun Sunrise Mini-Grid Ltd" })).toBeVisible();
     await expect(page.getByText(/^OGSERC\/ACK\/\d{4}\/00001$/)).toBeVisible();
     await expect(page.getByText("E – Mini-grids and interconnected mini-grids")).toBeVisible();
+    const sections = page.getByRole("region", { name: "REG-01E sections" });
+    await expect(sections.getByText("Isolated mini-grid")).toBeVisible();
+    await expect(sections.getByText("Ilaro")).toBeVisible();
     await expect(nextAction(page)).toContainText(
       "Await payment of ₦250,000, then Finance confirmation",
     );
@@ -84,15 +94,16 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     await page.goto("/submissions");
     await page.getByRole("link", { name: /OGSERC\/ACK\/\d{4}\/00001/ }).click();
 
-    // REG-01E's checklist: 12 items set by hand; evidence of payment ticks itself later.
+    // REG-01E's checklist: 11 items set by hand (isolated, so no interconnection agreement);
+    // evidence of payment ticks itself later.
     const received = page.getByRole("radio", { name: /: Received$/ });
-    await expect(received).toHaveCount(12);
+    await expect(received).toHaveCount(11);
     for (const radio of await received.all()) await radio.check();
     await expect(
       page.getByText("Pending – ticks itself once Finance confirms the fee"),
     ).toBeVisible();
     await page.getByRole("button", { name: "Save checklist" }).click();
-    await expect(page.getByRole("status")).toContainText("Checklist saved (12 changes)");
+    await expect(page.getByRole("status")).toContainText("Checklist saved (11 changes)");
     // Awaiting payment (§4.12): documents do not move it on until Finance confirms the fee.
     await expect(nextAction(page)).toContainText(
       "Await payment of ₦250,000, then Finance confirmation",

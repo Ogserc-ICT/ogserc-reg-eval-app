@@ -11,9 +11,21 @@ import { getSubmissionDetail, listRegister } from "@/server/register";
 import { hashSessionToken } from "@/server/session-store";
 import type { Actor } from "@/server/types";
 import { changeOwnPassword } from "@/server/users";
-import { asWorkflow, confirmPayments, makeUser, resetDb, testDb } from "./helpers";
+import {
+  asWorkflow,
+  confirmPayments,
+  makeUser,
+  resetDb,
+  testDb,
+  technicalAnswers,
+} from "./helpers";
 
 const db = testDb();
+
+/** REG-01E's category-specific sections answered, at each capacity these tests use. */
+const TECHNICAL: Record<string, string> = {
+  "2.5": technicalAnswers("REG-01E", 2.5),
+};
 afterAll(() => db.$disconnect());
 
 let registry: Actor;
@@ -42,6 +54,7 @@ const intake = (o: Record<string, string> = {}) => ({
   primaryActivityCode: "MGD",
   filingType: "NEW",
   formFiled: "REG-01E",
+  technicalData: TECHNICAL["2.5"],
   installedCapacityMw: "2.5",
   customers: "1,200",
   licenceStatus: "NERC registration/permit (mini-grid/captive)",
@@ -518,6 +531,7 @@ describe("Register list", () => {
         registeredName: "Beta Grid",
         primaryActivityCode: "EST",
         formFiled: "REG-01G",
+        technicalData: technicalAnswers("REG-01G", 2.5),
       }),
     );
     await recordPayment(db, finance, {

@@ -8,6 +8,7 @@ import { formatNaira } from "@/domain/money";
 import { formatAckNo } from "@/domain/numbers";
 import { can } from "@/domain/roles";
 import { assessSubmission } from "@/domain/submission";
+import { parseTechnical, technicalChanges, type TechnicalData } from "@/domain/technical";
 import { FILING_LABELS, STATUS, isClosed, isLinkedFiling } from "@/domain/types";
 import { isValidTin } from "@/domain/validation";
 import {
@@ -94,6 +95,8 @@ async function checkAgainstReferenceData(tx: Tx, v: SubmissionFields, today?: st
     fail("incorporationDate", "Cannot be in the future");
   if (v.tin && !isValidTin(v.tin, ctx.settings.policy.tinPattern))
     fail("tin", "TIN format is not valid");
+  const technical = parseTechnical(ctx.ref.technical, v.technicalData);
+  for (const e of technical.errors) fail("technicalData", e);
 
   // Updates and annual confirmations quote the registration number of a Registered record.
   let linked: Submission | null = null;
@@ -138,7 +141,7 @@ async function checkAgainstReferenceData(tx: Tx, v: SubmissionFields, today?: st
 
   if (Object.keys(errors).length)
     throw new ValidationError("Please correct the highlighted fields.", errors);
-  return { ctx, names, linked };
+  return { ctx, names, linked, technicalData: technical.data };
 }
 
 /**
@@ -324,7 +327,11 @@ export async function createSubmission(
   const v = parsed.data;
 
   return db.$transaction(async (tx) => {
-    const { ctx, names, linked } = await checkAgainstReferenceData(tx, v, opts.today);
+    const { ctx, names, linked, technicalData } = await checkAgainstReferenceData(
+      tx,
+      v,
+      opts.today,
+    );
 
     if (v.evaluatingOfficerId) {
       const officer = await tx.user.findUnique({ where: { id: v.evaluatingOfficerId } });
@@ -358,6 +365,7 @@ export async function createSubmission(
         ...submissionData(v),
         filingType: v.filingType,
         linkedSubmissionId: linked?.id ?? null,
+        technicalData: technicalData as object,
         ackSeq: seq,
         ackNo,
         createdById: actor.id,
@@ -560,7 +568,10 @@ export async function updateSubmission(
       });
     }
     // The link is fixed (DB trigger); the form only shows it, so it is not looked up again.
-    await checkAgainstReferenceData(tx, { ...v, linkedRegistrationNo: null });
+    const { ctx, technicalData } = await checkAgainstReferenceData(tx, {
+      ...v,
+      linkedRegistrationNo: null,
+    });
     const duplicate =
       v.cacNo !== current.cacNo &&
       (await checkDuplicateCac(
@@ -588,6 +599,14 @@ export async function updateSubmission(
     for (const k of changedChildren) {
       changes.push(`${CHILD_LABELS[k]}: ${before[k] ?? "(none)"} → ${after[k] ?? "(none)"}`);
     }
+    const technical = technicalChanges(
+      ctx.ref.technical,
+      current.technicalData as unknown as TechnicalData,
+      technicalData,
+    );
+    for (const c of technical) {
+      changes.push(`${c.label}: ${c.before ?? "(blank)"} → ${c.after ?? "(blank)"}`);
+    }
     if (!changes.length) return current;
 
     // A Registered record's certificate shows these fields; changing one means the certificate must be reissued.
@@ -596,7 +615,11 @@ export async function updateSubmission(
       [...changed, ...changedChildren].some((k) => CERTIFICATE_FIELDS.has(k));
     const updated = await tx.submission.update({
       where: { id },
-      data: { ...next, ...(reissue ? { certificateNeedsReissue: true } : {}) },
+      data: {
+        ...next,
+        ...(technical.length ? { technicalData: technicalData as object } : {}),
+        ...(reissue ? { certificateNeedsReissue: true } : {}),
+      },
     });
     if (changedChildren.length) await writeChildren(tx, id, children);
     const notes = [

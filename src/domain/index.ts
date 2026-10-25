@@ -23,3 +23,4 @@ export * from "./dashboard";
 export * from "./forms";
 export * from "./legacy-documents";
 export * from "./filing";
+export * from "./technical";
