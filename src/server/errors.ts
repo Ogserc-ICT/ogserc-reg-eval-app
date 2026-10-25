@@ -18,8 +18,19 @@ export class ValidationError extends Error {
     this.name = "ValidationError";
   }
 
+  /**
+   * Errors by top-level field. Problems inside a table (e.g. licences[1].expiryDate) are reported
+   * under the table's field as "Row 2: ...".
+   */
   static fromZod(error: ZodError): ValidationError {
-    const fieldErrors = error.flatten().fieldErrors as Record<string, string[]>;
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of error.issues) {
+      const [field, row] = issue.path;
+      if (field === undefined) continue;
+      const message = typeof row === "number" ? `Row ${row + 1}: ${issue.message}` : issue.message;
+      const list = (fieldErrors[String(field)] ??= []);
+      if (!list.includes(message)) list.push(message);
+    }
     return new ValidationError("Please correct the highlighted fields.", fieldErrors);
   }
 }

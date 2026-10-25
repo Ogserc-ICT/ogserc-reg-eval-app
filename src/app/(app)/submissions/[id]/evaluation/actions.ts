@@ -8,6 +8,7 @@ import {
   approveAndRegister,
   assignOfficers,
   cancelSubmission,
+  confirmCategory,
   issueDeficiency,
   lapseSubmission,
   markSubmissionComplete,
@@ -98,9 +99,28 @@ export async function approveAction(
 ): Promise<ActionState> {
   const values = formValues(fd, ["flagOverrideReason"]);
   return runAction(async (actor) => {
-    const { registrationNo } = await approveAndRegister(db, actor, id, values);
+    const { registrationNo, applied } = await approveAndRegister(db, actor, id, values);
     refresh(id);
+    if (applied) {
+      revalidatePath("/submissions", "layout");
+      return `Approved. ${applied.length} change(s) applied to ${registrationNo}.`;
+    }
     return `Registered as ${registrationNo}.`;
+  }, values);
+}
+
+export async function confirmCategoryAction(
+  id: string,
+  _prev: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  const values = formValues(fd, ["category", "reason"]);
+  return runAction(async (actor) => {
+    const r = await confirmCategory(db, actor, id, values);
+    refresh(id);
+    return r.differs
+      ? `Category ${r.category} confirmed, with the reason it differs from the form filed.`
+      : `Category ${r.category} confirmed.`;
   }, values);
 }
 

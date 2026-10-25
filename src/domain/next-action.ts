@@ -1,7 +1,7 @@
 import { formatDate } from "./dates";
 import { formatNaira } from "./money";
 import type { Assessment } from "./submission";
-import { STATUS, type IsoDate, type SubmissionInput } from "./types";
+import { STATUS, isLinkedFiling, type IsoDate, type SubmissionInput } from "./types";
 
 /** §2.11: the next action shown on the submission page. */
 export function nextAction(sub: SubmissionInput, a: Assessment, today: IsoDate): string {
@@ -10,6 +10,7 @@ export function nextAction(sub: SubmissionInput, a: Assessment, today: IsoDate):
       return sub.registrationNo ? "Complete" : "Lock the registration number";
     case STATUS.CANCELLED:
     case STATUS.REFUSED:
+    case STATUS.APPLIED:
       return `Closed – ${sub.status}`;
     case STATUS.LAPSED:
       return `Closed – ${sub.status}; fresh application needed`;
@@ -40,6 +41,10 @@ export function nextAction(sub: SubmissionInput, a: Assessment, today: IsoDate):
   }
   if (!sub.dateSubmissionComplete || !a.determinationDue)
     return "Enter the Date Submission Complete";
-  if (today > a.determinationDue) return "Overdue – provisional registration applies (para 13(4))";
+  if (today > a.determinationDue) {
+    return isLinkedFiling(sub.filingType)
+      ? "Overdue – determine and apply the changes"
+      : "Overdue – provisional registration applies (para 13(4))";
+  }
   return `Determine by ${formatDate(a.determinationDue)}`;
 }

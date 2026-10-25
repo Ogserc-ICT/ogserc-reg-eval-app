@@ -1,3 +1,4 @@
+import formsFile from "../../registration-forms.json";
 import seedFile from "../../seed-data.json";
 import { referenceDataFromSeed, settingsFromSeed } from "@/domain/reference";
 import { writeAudit } from "./audit";
@@ -8,11 +9,11 @@ import { LISTS, settingsToRow } from "./reference-data";
 import type { Db } from "./types";
 
 /**
- * Seed reference data from seed-data.json. Create-only: rows that already exist are left alone,
+ * Seed reference data from seed-data.json and registration-forms.json. Create-only: rows that already exist are left alone,
  * so re-running never overwrites values an admin has edited.
  */
 export async function seedReferenceData(db: Db): Promise<void> {
-  const ref = referenceDataFromSeed(seedFile);
+  const ref = referenceDataFromSeed(seedFile, formsFile);
   const settings = settingsFromSeed(seedFile);
 
   await db.$transaction(async (tx) => {
@@ -60,8 +61,26 @@ export async function seedReferenceData(db: Db): Promise<void> {
       });
     }
 
-    await tx.schedule2Document.createMany({
-      data: ref.schedule2Documents.map((name, i) => ({ number: i + 1, name })),
+    await tx.registrationForm.createMany({
+      data: ref.forms.map((f, i) => ({
+        form: f.form,
+        category: f.category,
+        title: f.title,
+        para: f.para,
+        sortOrder: i + 1,
+      })),
+      skipDuplicates: true,
+    });
+    await tx.formDocument.createMany({
+      data: ref.forms.flatMap((f) =>
+        f.documents.map((d, i) => ({
+          form: f.form,
+          key: d.key,
+          text: d.text,
+          requiredWhen: d.requiredWhen,
+          sortOrder: i + 1,
+        })),
+      ),
       skipDuplicates: true,
     });
 

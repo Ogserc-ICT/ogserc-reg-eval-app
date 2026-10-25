@@ -34,8 +34,33 @@ function toValues(s: Settings): Values {
     lateChargeRequiredForRelease: s.policy.lateChargeRequiredForRelease,
     unpaidReminderDays:
       s.policy.unpaidReminderDays === null ? "" : String(s.policy.unpaidReminderDays),
+    supplyRetailCategory1MwPlus: s.policy.supplyRetailCategory1MwPlus,
+    wrongFormHandling: s.policy.wrongFormHandling,
+    otherActivitiesRequireDocuments: s.policy.otherActivitiesRequireDocuments,
+    ownUseCertificate: s.policy.ownUseCertificate,
+    filingFeeOnUpdates: s.policy.filingFeeOnUpdates,
+    annualConfirmationDue: s.annualConfirmationDue,
   };
 }
+
+/** Category forms REG-01A to K: open policy points (docs/DECISIONS.md), each change audited. */
+const FORM_POLICIES: { name: string; label: string; hint: string }[] = [
+  {
+    name: "otherActivitiesRequireDocuments",
+    label: "Other activities require their form’s documents",
+    hint: "Off: the checklist is the form filed's. On: the documents of each other activity's form are added (each shared document once).",
+  },
+  {
+    name: "ownUseCertificate",
+    label: "Own-use notifications (REG-01I) get a certificate",
+    hint: "On: an approving officer can register a paid, complete notification, with an I-CPT registration number and CERT-01.",
+  },
+  {
+    name: "filingFeeOnUpdates",
+    label: "Charge the registration fee on updates and annual confirmations",
+    hint: "Off: no fee. On: the category's registration fee (never a late charge).",
+  },
+];
 
 const PERIODS: { name: string; label: string; hint: string }[] = [
   { name: "registrationPeriodDays", label: "Registration period (days)", hint: "Para 11(1)." },
@@ -211,6 +236,73 @@ export function SettingsForm({ settings }: { settings: Settings }) {
               className={`${inputClass} font-mono`}
             />
           </Field>
+        </div>
+      </Section>
+
+      <Section title="Category forms REG-01A to K (open policy points)">
+        <div className="space-y-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Supply / retail at 1 MW or more: category"
+              name="supplyRetailCategory1MwPlus"
+              errors={errors}
+              hint="K, as the activity map has it, unless the Commission decides otherwise (e.g. F, with trading and bulk supply). Below 1 MW Supply / retail is K. Saved pricing is not changed; affected records show “pricing out of date”."
+            >
+              <select
+                id="supplyRetailCategory1MwPlus"
+                name="supplyRetailCategory1MwPlus"
+                defaultValue={text("supplyRetailCategory1MwPlus")}
+                className={`${inputClass} max-w-32`}
+              >
+                {"ABCDEFGHJK".split("").map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              label="Submission on the wrong form"
+              name="wrongFormHandling"
+              errors={errors}
+              hint="Accept: the evaluator confirms the right category with a reason and the matching form's documents apply. Require: check 1.10 fails, so a deficiency notice asks for the right form."
+            >
+              <select
+                id="wrongFormHandling"
+                name="wrongFormHandling"
+                defaultValue={text("wrongFormHandling")}
+                className={inputClass}
+              >
+                <option value="ACCEPT">Accept and re-categorise</option>
+                <option value="REQUIRE_CORRECT_FORM">Require the correct form</option>
+              </select>
+            </Field>
+            <Field
+              label="Annual confirmation due each year (MM-DD)"
+              name="annualConfirmationDue"
+              errors={errors}
+              hint="Para 16(2): 31 January (01-31)."
+            >
+              <input
+                id="annualConfirmationDue"
+                name="annualConfirmationDue"
+                defaultValue={text("annualConfirmationDue")}
+                className={`${inputClass} max-w-32 font-mono`}
+              />
+            </Field>
+          </div>
+          {FORM_POLICIES.map((p) => (
+            <label key={p.name} className="flex gap-2 text-sm">
+              <input
+                type="checkbox"
+                name={p.name}
+                defaultChecked={v[p.name] === true}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">{p.label}</span>
+                <span className="block text-xs text-gray-500">{p.hint}</span>
+              </span>
+            </label>
+          ))}
         </div>
       </Section>
 

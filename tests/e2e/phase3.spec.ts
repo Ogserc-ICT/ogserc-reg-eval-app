@@ -19,6 +19,7 @@ async function as(browser: Browser, who: { email: string; password: string }) {
 }
 
 async function fillSubmission(page: Page, name: string, cac: string) {
+  await page.getByLabel(/^Form filed/).selectOption("REG-01E");
   await page.getByLabel(/^Registered name/).fill(name);
   await page.getByLabel("CAC number").fill(cac);
   await page.getByLabel(/^Principal LGA/).selectOption("Ifo");
@@ -27,8 +28,9 @@ async function fillSubmission(page: Page, name: string, cac: string) {
   await page
     .getByLabel(/^Licence status/)
     .selectOption("NERC registration/permit (mini-grid/captive)");
-  await page.getByLabel("Licence number").fill("NERC/MG/9");
-  await page.getByLabel("Phone").fill("08012345678");
+  await page.getByRole("button", { name: "+ Add licence" }).click();
+  await page.getByLabel("Number, row 1").fill("NERC/MG/9");
+  await page.getByLabel("Compliance officer phone").fill("08012345678");
 }
 
 const nextAction = (page: Page) => page.getByRole("region", { name: "Next action" });
@@ -82,12 +84,15 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     await page.goto("/submissions");
     await page.getByRole("link", { name: /OGSERC\/ACK\/\d{4}\/00001/ }).click();
 
-    for (let n = 1; n <= 13; n++) {
-      const label = n === 13 ? /^13\. .*: N\/A$/ : new RegExp(`^${n}\\. .*: Received$`);
-      await page.getByRole("radio", { name: label }).check();
-    }
+    // REG-01E's checklist: 12 items set by hand; evidence of payment ticks itself later.
+    const received = page.getByRole("radio", { name: /: Received$/ });
+    await expect(received).toHaveCount(12);
+    for (const radio of await received.all()) await radio.check();
+    await expect(
+      page.getByText("Pending – ticks itself once Finance confirms the fee"),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Save checklist" }).click();
-    await expect(page.getByRole("status")).toContainText("Checklist saved (13 changes)");
+    await expect(page.getByRole("status")).toContainText("Checklist saved (12 changes)");
     // Awaiting payment (§4.12): documents do not move it on until Finance confirms the fee.
     await expect(nextAction(page)).toContainText(
       "Await payment of ₦250,000, then Finance confirmation",
@@ -161,8 +166,9 @@ test.describe.serial("Phase 3: intake, documents, payments, own-use", () => {
     const fill = async (name: string, kw: string) => {
       await page.goto("/own-use/new");
       await page.getByLabel(/^Name/).fill(name);
-      await page.getByLabel(/^LGA/).selectOption("Ewekoro");
-      await page.getByLabel(/^Installed capacity \(kW\)/).fill(kw);
+      await page.getByLabel(/^Local government area/).selectOption("Ewekoro");
+      await page.getByRole("button", { name: "+ Add unit" }).click();
+      await page.getByLabel("Installed kW, row 1").fill(kw);
       await page.getByRole("button", { name: "Save notification" }).click();
     };
     await fill("Tiny Bakery", "150");

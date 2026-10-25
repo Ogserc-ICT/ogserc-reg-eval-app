@@ -5,7 +5,8 @@ import { checkIsEditable } from "@/domain/evaluation";
 import { formatNaira } from "@/domain/money";
 import { deficiencyNoticeRef } from "@/domain/numbers";
 import { ROLE_LABELS, can, canEditChecks, type Role } from "@/domain/roles";
-import { STATUS, isClosed, type IsoDate } from "@/domain/types";
+import { formCodeFor } from "@/domain/forms";
+import { STATUS, isClosed, isLinkedFiling, type IsoDate } from "@/domain/types";
 import { gateReason } from "@/domain/finance";
 import {
   REFUSAL_GROUNDS,
@@ -20,7 +21,7 @@ import {
   refusalBlockers,
   separationOfDutiesViolations,
 } from "@/domain/workflow";
-import { reasonSchema } from "@/lib/schemas";
+import { categoryConfirmSchema, reasonSchema } from "@/lib/schemas";
 import { writeAudit } from "./audit";
 import { notify, subjectOf } from "./notifications";
 import { loadContext } from "./context";
@@ -34,6 +35,7 @@ import {
 } from "./errors";
 import { storeCertificate, storeDeficiencyNotice } from "./documents";
 import { loadEvaluationState, type EvaluationState } from "./evaluation-state";
+import { applyFiling } from "./filings";
 import { requireFinanceGate } from "./finance";
 import { fromIsoDate, toIsoDate } from "./reference-data";
 import type { Actor, Db, Tx } from "./types";
@@ -320,6 +322,88 @@ export async function recordReview(db: Db, actor: Actor, id: string, opts: Workf
   });
 }
 
+/**
+ * "Category confirmed" (official-use box): the evaluator records the category the submission belongs
+ * in, with a reason when it differs from the form filed. Until a final decision it can be confirmed
+ * again. It does not change the fee: if it differs from the category charged, the record is flagged
+ * until the details are corrected and an admin recalculates (docs/DECISIONS.md).
+ */
+export async function confirmCategory(
+  db: Db,
+  actor: Actor,
+  id: string,
+  input: unknown,
+  opts: WorkflowOptions = {},
+) {
+  assertCan(actor, "evaluation.editChecks");
+  const parsed = categoryConfirmSchema.safeParse(input);
+  if (!parsed.success) throw ValidationError.fromZod(parsed.error);
+  const { category, reason } = parsed.data;
+  const today = opts.today ?? appToday();
+
+  await requireFinanceGate(db, actor, id, "Category confirmation", today);
+  return inTx(db, async (tx) => {
+    const { ctx, state } = await stateFor(tx, id, today);
+    assertReleased(state, "Category confirmation");
+    requireAssignedEvaluatorOrSupervisor(actor, state);
+    blockIf(
+      [
+        ...(isClosed(state.sub.status) ? [`Submission is closed (${state.sub.status})`] : []),
+        ...(state.evaluation.finalDecision ? ["A final decision is already recorded"] : []),
+      ],
+      "The category cannot be confirmed now.",
+    );
+    if (!ctx.ref.fees.some((f) => f.category === category)) {
+      throw new ValidationError("Please correct the highlighted fields.", {
+        category: ["Choose a Schedule 3 category"],
+      });
+    }
+    const formCategory = state.assessment.formCategory;
+    const differs = category !== formCategory;
+    if (differs && !reason) {
+      throw new ValidationError("Please correct the highlighted fields.", {
+        reason: [
+          `Give the reason: the form filed (${state.sub.formFiled}) is for Category ${formCategory ?? "?"}`,
+        ],
+      });
+    }
+    const previous = state.sub.confirmedCategory;
+    await tx.submission.update({
+      where: { id },
+      data: {
+        confirmedCategory: category,
+        categoryConfirmedReason: differs ? reason : null,
+        categoryConfirmedById: actor.id,
+        categoryConfirmedOn: fromIsoDate(today),
+      },
+    });
+    const charged = state.assessment.categoryApplied;
+    const notes = [
+      `Category ${category} confirmed (form filed ${state.sub.formFiled})`,
+      ...(previous && previous !== category ? [`was ${previous}`] : []),
+      ...(differs
+        ? [
+            ctx.settings.policy.wrongFormHandling === "ACCEPT"
+              ? `accepted and re-categorised: ${reason}; documents now follow ${formCodeFor(category)}`
+              : `differs from the form: ${reason}; the applicant must file on ${formCodeFor(category)}`,
+          ]
+        : []),
+      ...(charged && charged !== category
+        ? [
+            `Category ${charged} is charged: correct the details or override, then an admin recalculates`,
+          ]
+        : []),
+    ];
+    await writeAudit(tx, {
+      userId: actor.id,
+      action: "Category confirmed",
+      reference: state.row.ackNo,
+      detail: notes.join("; "),
+    });
+    return { category, differs };
+  });
+}
+
 // --- Status changes -------------------------------------------------------------
 
 function requireAssignedEvaluatorOrSupervisor(actor: Actor, state: EvaluationState) {
@@ -506,8 +590,50 @@ export async function approveAndRegister(
       createdById: state.row.createdById,
       actorId: actor.id,
       settings: ctx.settings,
+      linked: state.linked,
     };
     blockIf(approvalBlockers(approval), "Approval is blocked.");
+    const overridden =
+      state.flags.length && override
+        ? `; ${state.flags.length} data flag(s) overridden: ${override}`
+        : "";
+
+    // Updates and annual confirmations: no number or certificate; the changes go to the registration.
+    if (isLinkedFiling(state.sub.filingType)) {
+      const changes = approvalChanges(approval, actor.name, 0, today);
+      await tx.submission.update({
+        where: { id },
+        data: {
+          status: "APPLIED",
+          dateSubmissionComplete: fromIsoDate(changes.submission.dateSubmissionComplete),
+        },
+      });
+      await tx.evaluation.update({
+        where: { id: state.evaluationRow.id },
+        data: {
+          finalDecision: "APPLY",
+          reviewDate: fromIsoDate(changes.evaluation.reviewDate),
+          approvalDate: fromIsoDate(today),
+          flagOverrideReason: state.flags.length ? override : state.evaluation.flagOverrideReason,
+        },
+      });
+      const applied = await applyFiling(tx, actor, id, today);
+      await writeAudit(tx, {
+        userId: actor.id,
+        action: "Changes applied",
+        reference: state.sub.ackNo,
+        detail:
+          `${changes.auditDetail}: ${applied.changes.length} change(s)` +
+          (applied.reissue ? "; certificate needs reissue" : "") +
+          overridden,
+      });
+      await notify(tx, actor.id, {
+        kind: "decided",
+        sub: subjectOf(state),
+        outcome: "Changes Applied",
+      });
+      return { registrationNo: applied.registered.registrationNo!, applied: applied.changes };
+    }
 
     const serial = await nextCounter(tx, COUNTER.registration(yearOf(today)));
     const changes = approvalChanges(approval, actor.name, serial, today);
@@ -529,10 +655,6 @@ export async function approveAndRegister(
         flagOverrideReason: state.flags.length ? override : state.evaluation.flagOverrideReason,
       },
     });
-    const overridden =
-      state.flags.length && override
-        ? `; ${state.flags.length} data flag(s) overridden: ${override}`
-        : "";
     // §4.6: the certificate is produced in the same transaction; if it cannot be, nothing is approved.
     await storeCertificate(tx, actor, id, ctx, { reissue: false });
     await writeAudit(tx, {
@@ -542,7 +664,7 @@ export async function approveAndRegister(
       detail: changes.auditDetail + overridden,
     });
     await notify(tx, actor.id, { kind: "decided", sub: subjectOf(state), outcome: "Registered" });
-    return { registrationNo: changes.submission.registrationNo! };
+    return { registrationNo: changes.submission.registrationNo!, applied: null };
   });
 }
 
@@ -727,6 +849,11 @@ export async function reopenDecision(
     if (status === STATUS.REGISTERED) {
       throw new BlockedError("This decision cannot be reopened.", [
         `Registered as ${row.registrationNo}: the registration number is locked. Cancel the registration instead (para 14).`,
+      ]);
+    }
+    if (status === STATUS.APPLIED) {
+      throw new BlockedError("This decision cannot be reopened.", [
+        "Its changes are already applied to the registration. File a new update to correct them.",
       ]);
     }
     if (!isClosed(status)) {

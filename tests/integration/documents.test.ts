@@ -25,7 +25,14 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 import jsQR from "jsqr";
 import { getVerification } from "@/server/verify";
 import { pdfText, renderPage } from "../support/pdf";
-import { confirmPayments, makeUser, resetDb, testDb } from "./helpers";
+import {
+  confirmFormCategory,
+  confirmPayments,
+  formDocuments,
+  makeUser,
+  resetDb,
+  testDb,
+} from "./helpers";
 
 const db = testDb();
 afterAll(() => db.$disconnect());
@@ -57,12 +64,12 @@ const form = (o: Record<string, string> = {}) => ({
   principalLga: "Ifo",
   otherAreasServed: "Ewekoro",
   primaryActivityCode: "MGD",
-  secondaryActivityCode: "",
+  filingType: "NEW",
+  formFiled: "REG-01E",
   installedCapacityMw: "2.5",
   customers: "",
   licenceStatus: "NERC registration/permit (mini-grid/captive)",
-  licenceNo: "NERC/MG/77",
-  licenceExpiry: "",
+  licences: [{ number: "NERC/MG/77" }],
   complianceOfficer: "Jane Doe",
   phone: "",
   email: "",
@@ -102,12 +109,7 @@ async function assign(id: string) {
 
 async function readyAndRegistered() {
   const sub = await newSubmission();
-  await updateDocuments(
-    db,
-    registry,
-    sub.id,
-    Object.fromEntries(Array.from({ length: 13 }, (_, i) => [String(i + 1), "Y"])),
-  );
+  await updateDocuments(db, registry, sub.id, formDocuments());
   await recordPayment(db, registry, {
     dateReceived: TODAY,
     reference: sub.ackNo,
@@ -118,6 +120,7 @@ async function readyAndRegistered() {
   });
   await confirmPayments(db, sub.ackNo, TODAY);
   await assign(sub.id);
+  await confirmFormCategory(db, evaluator, sub.id, TODAY);
   const state = (await loadEvaluationState(db, sub.id, await loadContext(db, TODAY)))!;
   const values = Object.fromEntries(
     state.checks.filter((c) => c.mode === "manual" && !c.postApproval).map((c) => [c.id, "Y"]),
@@ -148,7 +151,7 @@ const textOf = async (bytes: Uint8Array | Buffer) =>
 
 describe("acknowledgement letter (para 10(3))", () => {
   it("is stored with its SHA-256 and the merged wording", async () => {
-    const sub = await newSubmission({ licenceStatus: "Unlicensed", licenceNo: "" });
+    const sub = await newSubmission({ licenceStatus: "Unlicensed", licences: "[]" });
     const doc = await generateAcknowledgement(db, registry, sub.id, TODAY);
     const [row] = await docs(sub.id, "ACKNOWLEDGEMENT");
     expect(row).toMatchObject({
@@ -167,7 +170,12 @@ describe("acknowledgement letter (para 10(3))", () => {
       "Category E — Mini-grids and interconnected mini-grids (subject to evaluation)",
     );
     expect(text).toContain("₦250,000");
-    expect(text).toContain("Pending: 1. CAC certificate");
+    // REG-01E's list; the letter also says which form and filing it is.
+    expect(text).toContain("New registration, on Form REG-01E");
+    expect(text).toContain(
+      "Pending: Certificate of incorporation / registration (or community or cooperative registration)",
+    );
+    expect(text).toContain("Evidence of payment of the registration fee — please supply");
     expect(text).toContain("within thirty (30) days");
     // Unlicensed: paragraph 18 obligation with the licence application date.
     expect(text).toContain("must apply for the appropriate licence or permit by 20 January 2027");
@@ -176,12 +184,17 @@ describe("acknowledgement letter (para 10(3))", () => {
 
   it("prints 'Pending: none.' only, when nothing is pending", async () => {
     const sub = await newSubmission();
-    await updateDocuments(
-      db,
-      registry,
-      sub.id,
-      Object.fromEntries(Array.from({ length: 13 }, (_, i) => [String(i + 1), "Y"])),
-    );
+    await updateDocuments(db, registry, sub.id, formDocuments());
+    // Evidence of payment ticks itself once Finance confirms the fee.
+    await recordPayment(db, registry, {
+      dateReceived: TODAY,
+      reference: sub.ackNo,
+      purpose: "",
+      channel: "",
+      amount: "250000",
+      rrr: "",
+    });
+    await confirmPayments(db, sub.ackNo, TODAY);
     await generateAcknowledgement(db, registry, sub.id, TODAY);
     const text = await textOf((await docs(sub.id, "ACKNOWLEDGEMENT"))[0]!.content);
     expect(text).toContain("Pending: none.");

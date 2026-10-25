@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { inputClass } from "@/components/form";
 import { can } from "@/domain/roles";
-import { STATUSES } from "@/domain/types";
+import { FILING_LABELS, STATUSES } from "@/domain/types";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { loadFormOptions } from "@/server/options";
@@ -112,6 +112,16 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
             "activity",
             "Activity",
             options.activities.map((a) => ({ value: a.code, label: a.code })),
+          )}
+          {select(
+            "filing",
+            "Filing",
+            Object.entries(FILING_LABELS).map(([value, label]) => ({ value, label })),
+          )}
+          {select(
+            "form",
+            "Form",
+            options.forms.map((f) => f.form),
           )}
           {select("lga", "LGA", options.lgas)}
           {select("payment", "Payment", ["Unpaid", "Part-paid", "Paid", "Nil"])}

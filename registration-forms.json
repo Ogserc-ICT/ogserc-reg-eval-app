@@ -1,0 +1,941 @@
+{
+  "_source": "Extracted from Forms OGSERC/REG-01A to REG-01K (version 2026.1) and the Registration Form Selection Guide. Fees and late charges on every form match seed-data.json schedule3_fees.",
+  "filing_types": [
+    "New registration",
+    "Update: material change (para 16(1))",
+    "Annual confirmation (para 16(2))"
+  ],
+  "filing_type_note": "Updates and annual confirmations quote the existing OGSERC registration number. Annual confirmation is due by 31 January each year.",
+  "common_sections_REG01A_to_K_except_I": {
+    "A Applicant": [
+      "registered name",
+      "trading name",
+      "registrant type (Company, Cooperative, Partnership, Sole proprietor, Public body, Community organization, Other)",
+      "CAC / registration no.",
+      "date of incorporation",
+      "TIN",
+      "registered address",
+      "operational address in Ogun State",
+      "website"
+    ],
+    "B Ownership and management": [
+      "shareholders/members ≥5%: name, nationality/country, % holding, beneficial owner Y/N (multiple)",
+      "directors and key officers: name, position, phone, email (multiple)",
+      "managing director / principal officer: name, phone, email",
+      "regulatory compliance officer: name, phone, email"
+    ],
+    "C Licences held": {
+      "status_checkboxes": [
+        "OGSERC licence or permit",
+        "NERC licence — activity wholly in Ogun State",
+        "NERC licence — multi-State licensee",
+        "NERC mini-grid / captive registration or permit",
+        "Licence application pending with OGSERC",
+        "No licence, permit or registration"
+      ],
+      "table (multiple)": [
+        "type",
+        "issuing authority",
+        "number",
+        "issue date",
+        "expiry date",
+        "activity / site covered"
+      ]
+    },
+    "D Service area": [
+      "LGAs served (multi-select of all 20)",
+      "principal LGA",
+      "towns, communities, estates or industrial clusters served"
+    ],
+    "Other activities": {
+      "options_multi_select": [
+        "Successor distribution company",
+        "Integrated utility",
+        "Generation for sale",
+        "Captive generation",
+        "Distribution",
+        "Supply / retail",
+        "Trading / bulk supply",
+        "Mini-grid",
+        "Private or estate network",
+        "Franchise / sub-franchise",
+        "Metering",
+        "Other (describe)"
+      ],
+      "rule": "Tick every other activity; fee is for the highest category (para 17(1)); attach the activity section(s) of the matching form"
+    },
+    "Health, safety and environment": [
+      "incidents in last 24 months: date, location, type (incident / fatality / outage > 24 h), description and action (multiple)"
+    ],
+    "Confidentiality claim": [
+      "item claimed as commercially sensitive, reasons (multiple)"
+    ],
+    "Registration fee": [
+      "category, fee and late charge printed on the form",
+      "amount paid",
+      "payment reference / receipt no. and date"
+    ],
+    "Declaration": [
+      "two signatories (name, designation, signature, date, seal): director + company secretary; else two directors/principal officers; sole proprietor alone; public body by accounting officer"
+    ],
+    "Official use box": [
+      "acknowledgement no.",
+      "date received",
+      "received by",
+      "category confirmed (this category / other)",
+      "OGSERC registration no.",
+      "certificate issue date",
+      "form control no.",
+      "issued by (initials)"
+    ]
+  },
+  "document_conditions": {
+    "holds_any_licence": "Licence status is anything other than 'No licence, permit or registration'",
+    "multi_state_licensee": "Form A applicant is a multi-State licensee (Section E/I)",
+    "generation_for_sale": "Generation activity includes any 'for sale' option (not captive only)",
+    "grid_connected": "Plant is connected to TCN, a DisCo or a private network",
+    "interconnected_minigrid": "Mini-grid type is interconnected",
+    "f_distribution": "Form F Part 1 (distribution) applies",
+    "f_trading": "Form F Part 2 (trading and bulk supply) applies",
+    "g_disco_bulk_supply": "Network's source of supply is DisCo bulk supply (inferred; the form doesn't mark it conditional — confirm)",
+    "sub_franchise": "Applicant is a sub-franchisee"
+  },
+  "measurement_units_note": "Forms A, B, C, D, F, J report energy in MWh; E, G, K report kWh; I reports kW and MWh. Normalise on storage.",
+  "forms": [
+    {
+      "form": "REG-01A",
+      "category": "A",
+      "title": "Successor distribution companies",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "SDC"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Single-line diagram of the Ogun State network"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset register with GPS coordinates of substations"
+        },
+        {
+          "key": "bulk_supply_agreements",
+          "text": "Bulk supply and interface agreements"
+        },
+        {
+          "key": "tariff_order",
+          "text": "Approved tariff order and band classification applied"
+        },
+        {
+          "key": "customer_enumeration",
+          "text": "Customer enumeration summary by class and metering status"
+        },
+        {
+          "key": "largest_customers",
+          "text": "List of the 20 largest customers"
+        },
+        {
+          "key": "env_safety_permits",
+          "text": "Environmental and safety permits"
+        },
+        {
+          "key": "financials",
+          "text": "Audited financial statements, last two years (or para 12(2) alternative)"
+        },
+        {
+          "key": "multistate_ringfencing",
+          "text": "Multi-State: ring-fencing plan, separate Ogun registers and cross-boundary register (para 7(3))",
+          "required_when": "multi_state_licensee"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Distribution business (Ogun-only / multi-State / para 7(3)(a) successor; also operates generation?; business units; staff)",
+        "F Network assets (substations, 33/11 kV feeders, LV, transformers; bulk supply & interface points)",
+        "G Customers and service (by class metered/unmetered; service bands A–E with feeders, customers, hours, tariff; 20 largest customers)",
+        "H Commercial data and tariffs, last 12 months (energy received/billed MWh, customers billed, billed/collected ₦; tariff order)",
+        "I Multi-State licensees only, para 7 (Ogun successor company, separate accounts, ring-fencing plan, cross-boundary feeders and energy)",
+        "J Other activities in Ogun State",
+        "K Health, safety and environment (last 24 months)",
+        "L Confidentiality claim (para 15(3))",
+        "M Registration fee (Schedule 3)",
+        "N Documents attached (Schedule 2)",
+        "O Declaration"
+      ]
+    },
+    {
+      "form": "REG-01B",
+      "category": "B",
+      "title": "Integrated utilities",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "INT"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Single-line diagram of the plant and network"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset register with GPS coordinates of plant and substations"
+        },
+        {
+          "key": "fuel_supply_agreements",
+          "text": "Gas or fuel supply agreements"
+        },
+        {
+          "key": "supply_ppa_agreements",
+          "text": "Bulk supply, power purchase and customer supply agreements"
+        },
+        {
+          "key": "tariff_order",
+          "text": "Approved tariff order or tariff schedule applied"
+        },
+        {
+          "key": "customer_enumeration",
+          "text": "Customer enumeration summary by class and metering status"
+        },
+        {
+          "key": "env_permits_eia",
+          "text": "Environmental permits, including EIA approval"
+        },
+        {
+          "key": "financials",
+          "text": "Audited financial statements, last two years (or para 12(2) alternative)"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Integrated utility activities (generation / distribution / supply / industrial cluster; total MW; COD)",
+        "F Generating plant (units: LGA, GPS, fuel, installed & available MW, commissioned; gas supplier, MMscf/d, contract expiry)",
+        "G Distribution network (assets; bulk supply & interface points)",
+        "H Customers and tariffs (by class; 20 largest customers; tariff order)",
+        "I Operations and commercial data, last 12 months (generated, purchased, billed MWh; billed/collected ₦)",
+        "J Other activities in Ogun State",
+        "K Health, safety and environment (last 24 months)",
+        "L Confidentiality claim (para 15(3))",
+        "M Registration fee (Schedule 3)",
+        "N Documents attached (Schedule 2)",
+        "O Declaration"
+      ]
+    },
+    {
+      "form": "REG-01C",
+      "category": "C",
+      "title": "Generation of 10 MW and above",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "GEN",
+        "CPT",
+        "OTH"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Single-line diagram of the plant and connection"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset register with GPS coordinates of each plant"
+        },
+        {
+          "key": "connection_agreement",
+          "text": "Grid or network connection agreement"
+        },
+        {
+          "key": "ppa_offtake",
+          "text": "Power purchase and offtake agreements (sale only)",
+          "required_when": "generation_for_sale"
+        },
+        {
+          "key": "fuel_supply_agreements",
+          "text": "Gas or fuel supply agreements"
+        },
+        {
+          "key": "env_permits_eia",
+          "text": "Environmental permits, including EIA approval"
+        },
+        {
+          "key": "financials",
+          "text": "Audited financial statements, last two years (or para 12(2) alternative)"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Generation activity (for sale on-grid / embedded / off-grid, or captive own use; total MW; COD or planned)",
+        "F Generating plant (units: LGA, GPS, fuel, installed & available MW, commissioned; gas/fuel supply)",
+        "G Grid connection and offtake (connection point & kV, network connected to, revenue meter; offtakers with contracted MW, price basis, expiry)",
+        "H Operations, last 12 months (generated, sent out/used MWh, availability %, fuel used)",
+        "I Other activities in Ogun State",
+        "J Health, safety and environment (last 24 months)",
+        "K Confidentiality claim (para 15(3))",
+        "L Registration fee (Schedule 3)",
+        "M Documents attached (Schedule 2)",
+        "N Declaration"
+      ]
+    },
+    {
+      "form": "REG-01D",
+      "category": "D",
+      "title": "Generation of 1 MW to below 10 MW",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "GEN",
+        "CPT",
+        "OTH"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Single-line diagram of the plant and connection"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset register with GPS coordinates of each plant"
+        },
+        {
+          "key": "connection_agreement",
+          "text": "Grid or network connection agreement (if connected)",
+          "required_when": "grid_connected"
+        },
+        {
+          "key": "ppa_offtake",
+          "text": "Power purchase and offtake agreements (sale only)",
+          "required_when": "generation_for_sale"
+        },
+        {
+          "key": "fuel_supply_agreements",
+          "text": "Gas or fuel supply agreements"
+        },
+        {
+          "key": "env_permits",
+          "text": "Environmental permits"
+        },
+        {
+          "key": "financials",
+          "text": "Audited financial statements, last two years (or para 12(2) alternative)"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Generation activity (for sale on-grid / embedded / off-grid, or captive own use; total MW; COD or planned)",
+        "F Generating plant (units: LGA, GPS, fuel, installed & available MW, commissioned; gas/fuel supply)",
+        "G Grid connection and offtake (connection point & kV, network connected to, revenue meter; offtakers with contracted MW, price basis, expiry)",
+        "H Operations, last 12 months (generated, sent out/used MWh, availability %, fuel used)",
+        "I Other activities in Ogun State",
+        "J Health, safety and environment (last 24 months)",
+        "K Confidentiality claim (para 15(3))",
+        "L Registration fee (Schedule 3)",
+        "M Documents attached (Schedule 2)",
+        "N Declaration"
+      ]
+    },
+    {
+      "form": "REG-01E",
+      "category": "E",
+      "title": "Mini-grids and interconnected mini-grids",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "MGD"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation / registration (or community or cooperative registration)"
+        },
+        {
+          "key": "constitution",
+          "text": "Constitutional documents (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every NERC or OGSERC permit or registration, by site",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Site layout or single-line diagram for each site"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset list with GPS coordinates of each site"
+        },
+        {
+          "key": "community_consent",
+          "text": "Community agreement or host consent for each site"
+        },
+        {
+          "key": "interconnection_agreement",
+          "text": "Interconnection agreement with the DisCo (interconnected only)",
+          "required_when": "interconnected_minigrid"
+        },
+        {
+          "key": "tariff_order",
+          "text": "Tariff approval or tariff schedule applied"
+        },
+        {
+          "key": "customer_list",
+          "text": "Customer list by site and class"
+        },
+        {
+          "key": "env_safety_permits",
+          "text": "Environmental and safety permits"
+        },
+        {
+          "key": "financials",
+          "text": "Financial statements or management accounts (para 12(2))"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Mini-grid type (isolated / interconnected with DisCo; community-owned; grant-funded REA/NEP/DARES; interconnection agreement date)",
+        "F Sites (community, LGA, GPS, operating/building, permit no.) — MULTIPLE SITES",
+        "G Generation assets by site (solar kWp, battery kWh, diesel/gas kW, other, total kW)",
+        "H Connections and tariff by site (residential, commercial, productive use, public; % prepaid; tariff, approval, fixed charges)",
+        "I Operations, last 12 months, all sites (generated/sold kWh; billed/collected ₦)",
+        "J Other activities in Ogun State",
+        "K Health, safety and environment (last 24 months)",
+        "L Confidentiality claim (para 15(3))",
+        "M Registration fee (Schedule 3)",
+        "N Documents attached (Schedule 2)",
+        "O Declaration"
+      ]
+    },
+    {
+      "form": "REG-01F",
+      "category": "F",
+      "title": "Other distribution licensees; trading and bulk supply",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "DIS",
+        "MSL",
+        "IDN",
+        "TRD"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Single-line diagram of the network (distribution)",
+          "required_when": "f_distribution"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset register with GPS coordinates (distribution)",
+          "required_when": "f_distribution"
+        },
+        {
+          "key": "supply_ppa_agreements",
+          "text": "Bulk supply, power purchase and sale agreements"
+        },
+        {
+          "key": "wheeling_agreements",
+          "text": "Use-of-system or wheeling agreements (trading)",
+          "required_when": "f_trading"
+        },
+        {
+          "key": "tariff_order",
+          "text": "Tariff or price schedules applied"
+        },
+        {
+          "key": "customer_enumeration",
+          "text": "Customer enumeration summary (distribution)",
+          "required_when": "f_distribution"
+        },
+        {
+          "key": "credit_support",
+          "text": "Evidence of credit support (trading)",
+          "required_when": "f_trading"
+        },
+        {
+          "key": "env_safety_permits",
+          "text": "Environmental and safety permits (distribution)",
+          "required_when": "f_distribution"
+        },
+        {
+          "key": "financials",
+          "text": "Audited financial statements, last two years (or para 12(2) alternative)"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Part 1 — Distribution, if applicable (IEDN / other licensee; network assets; bulk supply points; customers; 12-month commercial data; tariff)",
+        "F Part 2 — Trading and bulk supply, if applicable (bulk trading, bulk supply, eligible customers, retail supply; sellers; buyers; wheeling agreements; credit support; 12-month bought/sold)",
+        "G Other activities in Ogun State",
+        "H Health, safety and environment (last 24 months)",
+        "I Confidentiality claim (para 15(3))",
+        "J Registration fee (Schedule 3)",
+        "K Documents attached (Schedule 2)",
+        "L Declaration"
+      ]
+    },
+    {
+      "form": "REG-01G",
+      "category": "G",
+      "title": "Private, estate and industrial-park networks",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "EST"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "developer_agreement",
+          "text": "Agreement with the developer or owner of the development"
+        },
+        {
+          "key": "bulk_supply_agreements",
+          "text": "Bulk supply agreement and bulk meter details",
+          "required_when": "g_disco_bulk_supply"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Single-line diagram of the network"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset register with GPS coordinates of transformers"
+        },
+        {
+          "key": "tariff_order",
+          "text": "Tariff schedule and basis"
+        },
+        {
+          "key": "customer_enumeration",
+          "text": "Customer enumeration summary"
+        },
+        {
+          "key": "financials",
+          "text": "Financial statements or management accounts (para 12(2))"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Network type (residential estate / industrial park / free zone / market / other; host development; developer; premises served)",
+        "F Source of supply (DisCo bulk supply with bulk meter & band, or own generation with plant table)",
+        "G Network assets (transformers kVA, 11/33 kV lines, LV, feeder pillars)",
+        "H Customers and tariff (by class; tariff and how set; service charges)",
+        "I Commercial data, last 12 months (bought/generated, billed kWh; billed/collected ₦)",
+        "J Other activities in Ogun State",
+        "K Health, safety and environment (last 24 months)",
+        "L Confidentiality claim (para 15(3))",
+        "M Registration fee (Schedule 3)",
+        "N Documents attached (Schedule 2)",
+        "O Declaration"
+      ]
+    },
+    {
+      "form": "REG-01H",
+      "category": "H",
+      "title": "Metering service providers",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "MET"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "nemsa_accreditation",
+          "text": "NEMSA certification or accreditation"
+        },
+        {
+          "key": "type_test_certificates",
+          "text": "Type-test certificates for each meter model"
+        },
+        {
+          "key": "client_contracts",
+          "text": "Contracts with distribution licensees or other clients"
+        },
+        {
+          "key": "installers_list",
+          "text": "List of certified installers and technical staff"
+        },
+        {
+          "key": "financials",
+          "text": "Financial statements or management accounts (para 12(2))"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Services provided (meter supply/MAP, installation, maintenance, data/vending; NEMSA accreditation no. & expiry; MAP contracts)",
+        "F Meter types (1-phase / 3-phase / MD / CT; brand & model; type-test cert no.; local/imported)",
+        "G Installations in Ogun State (by client and LGA, last 12 months and to date; workshop address; certified installers; faults; complaints)",
+        "H Other activities in Ogun State",
+        "I Health, safety and environment (last 24 months)",
+        "J Confidentiality claim (para 15(3))",
+        "K Registration fee (Schedule 3)",
+        "L Documents attached (Schedule 2)",
+        "M Declaration"
+      ]
+    },
+    {
+      "form": "REG-01I",
+      "category": "I",
+      "title": "Own-use generation notification (200 kW to below 1 MW)",
+      "para": "3(4); Schedule 1 Part B",
+      "activity_codes": [
+        "CPT"
+      ],
+      "notes": [
+        "ONE NOTIFICATION PER SITE (not per registrant)",
+        "Short form: no ownership, licence, service-area, other-activities, HSE or confidentiality sections",
+        "Late-registration charges do not apply (form cites para 19(1)); file within 60 days of the Effective Date",
+        "Sites of 1 MW+ register on REG-01D/C; below 200 kW need not file; any third-party supply means the activity's own form",
+        "Official-use box includes 'OGSERC Registration No.' and 'Certificate issue date'"
+      ],
+      "sections": [
+        "A Identity (name, CAC, site address, contact person, phone, email)",
+        "B Site and use (nature of premises/business, LGA, connected to a distribution licensee? which)",
+        "C Generation assets (up to 5+ units: make/model, installed kW, fuel/technology, avg monthly MWh; total)",
+        "D Notification fee (₦100,000; amount paid; payment reference)",
+        "E Declaration (sole own use, no third-party supply; undertakes to notify changes incl. reaching 1 MW)"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation / business registration"
+        },
+        {
+          "key": "nameplate_photos",
+          "text": "Photographs of generator nameplates"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the notification fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ]
+    },
+    {
+      "form": "REG-01J",
+      "category": "J",
+      "title": "Franchisees and sub-franchisees",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "FRN"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "franchise_agreement",
+          "text": "Franchise or sub-franchise agreement"
+        },
+        {
+          "key": "franchisor_consent",
+          "text": "Franchisor's consent or approval (sub-franchise)",
+          "required_when": "sub_franchise"
+        },
+        {
+          "key": "territory_map",
+          "text": "Map or list of feeders and communities in the territory"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset register with GPS coordinates of transformers"
+        },
+        {
+          "key": "customer_enumeration",
+          "text": "Customer enumeration summary"
+        },
+        {
+          "key": "financials",
+          "text": "Financial statements or management accounts (para 12(2))"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Franchise arrangement (franchisee / sub-franchisee; distribution & supply or supply/collection only; franchisor & head franchisee; agreement date, term, expiry; territory; investment obligations)",
+        "F Network assets in the territory (feeders, transformers, LV; assets owned by franchisee)",
+        "G Customers and tariff (by class; tariff applied; revenue-sharing with franchisor)",
+        "H Commercial data, last 12 months (received/billed MWh, customers billed, billed/collected ₦)",
+        "I Other activities in Ogun State",
+        "J Health, safety and environment (last 24 months)",
+        "K Confidentiality claim (para 15(3))",
+        "L Registration fee (Schedule 3)",
+        "M Documents attached (Schedule 2)",
+        "N Declaration"
+      ]
+    },
+    {
+      "form": "REG-01K",
+      "category": "K",
+      "title": "Any other activity below 1 MW",
+      "para": "12; Schedule 1 Part A",
+      "activity_codes": [
+        "GEN",
+        "SUP",
+        "OTH"
+      ],
+      "documents": [
+        {
+          "key": "incorporation",
+          "text": "Certificate of incorporation and CAC status report (or equivalent)"
+        },
+        {
+          "key": "constitution",
+          "text": "Memorandum and articles of association (or equivalent)"
+        },
+        {
+          "key": "licences",
+          "text": "Copy of every licence, permit or registration held",
+          "required_when": "holds_any_licence"
+        },
+        {
+          "key": "single_line_diagram",
+          "text": "Single-line diagram or simple layout of the installation"
+        },
+        {
+          "key": "asset_register",
+          "text": "Asset list with GPS coordinates"
+        },
+        {
+          "key": "supply_sale_agreements",
+          "text": "Supply or sale agreements"
+        },
+        {
+          "key": "tariff_order",
+          "text": "Tariff or price schedule"
+        },
+        {
+          "key": "financials",
+          "text": "Financial statements or management accounts (para 12(2))"
+        },
+        {
+          "key": "board_resolution",
+          "text": "Board resolution, or equivalent authorization, approving the registration and signatories"
+        },
+        {
+          "key": "payment_evidence",
+          "text": "Evidence of payment of the registration fee",
+          "note": "Tick automatically once Finance confirms the fee"
+        }
+      ],
+      "sections": [
+        "A Applicant",
+        "B Ownership and management",
+        "C Licences, permits and registrations held",
+        "D Service area",
+        "E Activity (generation for sale <1 MW / supply-retail <1 MW / other licensed activity / combination; description and who is supplied; date started or planned)",
+        "F Assets (units: LGA, GPS, technology, kW, commissioned)",
+        "G Customers and tariff (by class; tariff and how set)",
+        "H Operations, last 12 months (generated/bought, sold kWh; billed/collected ₦)",
+        "I Other activities in Ogun State",
+        "J Health, safety and environment (last 24 months)",
+        "K Confidentiality claim (para 15(3))",
+        "L Registration fee (Schedule 3)",
+        "M Documents attached (Schedule 2)",
+        "N Declaration"
+      ]
+    }
+  ]
+}

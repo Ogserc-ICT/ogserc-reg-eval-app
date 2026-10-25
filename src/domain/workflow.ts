@@ -9,9 +9,11 @@ import { formatRegistrationNo } from "./numbers";
 import type { Policy, Settings } from "./reference";
 import type { Assessment } from "./submission";
 import {
+  FILING,
   FINAL_DECISION,
   STATUS,
   isClosed,
+  isLinkedFiling,
   type EvaluationInput,
   type IsoDate,
   type Kobo,
@@ -155,6 +157,8 @@ export interface ApprovalInput {
   /** Authenticated user attempting the approval. */
   actorId: string;
   settings: Settings;
+  /** Updates and annual confirmations: the registered record the changes apply to. */
+  linked?: { status: Status | null; registrationNo: string | null } | null;
 }
 
 /** §4.6 Approve and register: every reason approval is blocked. */
@@ -191,7 +195,15 @@ export function approvalBlockers(input: ApprovalInput): string[] {
 
   reasons.push(...separationOfDutiesViolations(officersOf(ev, input.createdById)));
 
-  if (signatoriesMissing(settings)) {
+  if (isLinkedFiling(sub.filingType)) {
+    // No certificate is issued: the changes are applied to the registered record (para 16).
+    if (!input.linked) reasons.push("Not linked to a registered submission");
+    else if (input.linked.status !== STATUS.REGISTERED) {
+      reasons.push(
+        `The linked registration ${input.linked.registrationNo ?? ""} is ${input.linked.status}, not Registered`,
+      );
+    }
+  } else if (signatoriesMissing(settings)) {
     reasons.push("Certificate signatory names are not set in Settings");
   }
   return reasons;
@@ -217,6 +229,22 @@ export function approvalChanges(
   today: IsoDate,
 ): ApprovalChanges {
   const { sub, assessment: a, evaluation: ev, settings } = input;
+  if (isLinkedFiling(sub.filingType)) {
+    return {
+      submission: {
+        dateSubmissionComplete: sub.dateSubmissionComplete ?? today,
+        certificateIssueDate: null,
+        status: STATUS.APPLIED,
+        registrationNo: null,
+      },
+      evaluation: {
+        finalDecision: FINAL_DECISION.APPLY,
+        reviewDate: ev.reviewDate ?? today,
+        approvalDate: today,
+      },
+      auditDetail: `Approved by ${approverName}; changes applied to ${input.linked?.registrationNo ?? "the registration"}`,
+    };
+  }
   if (!a.categoryApplied || !a.primaryCode)
     throw new Error("Cannot number a registration without a category");
   const registrationNo = formatRegistrationNo(
@@ -286,7 +314,12 @@ export function refusalBlockers(
 /** §4.9 Cancel (admin only; the role check happens in the server action). */
 export function cancelBlockers(status: Status | null, reason: string | null): string[] {
   const reasons: string[] = [];
-  if (status === STATUS.CANCELLED || status === STATUS.REFUSED || status === STATUS.LAPSED) {
+  if (
+    status === STATUS.CANCELLED ||
+    status === STATUS.REFUSED ||
+    status === STATUS.LAPSED ||
+    status === STATUS.APPLIED
+  ) {
     reasons.push(`Submission is already closed (${status})`);
   }
   if (!reason?.trim()) reasons.push("A reason is required");
@@ -342,7 +375,13 @@ export function dailyReview(
         reminderDue.push(sub.id);
       }
     }
-    if (sub.status === STATUS.RECEIVED && a.determinationDue && a.determinationDue < today) {
+    // Para 13(4) provisional registration is for registrations, not updates or annual confirmations.
+    if (
+      sub.status === STATUS.RECEIVED &&
+      sub.filingType === FILING.NEW &&
+      a.determinationDue &&
+      a.determinationDue < today
+    ) {
       toProvisional.push(sub.id);
     }
     if (

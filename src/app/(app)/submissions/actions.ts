@@ -64,7 +64,7 @@ export async function updateDocumentsAction(
 ): Promise<ActionState> {
   const values = Object.fromEntries(
     [...fd.entries()]
-      .filter(([k]) => /^doc-\d+$/.test(k))
+      .filter(([k]) => /^doc-[a-z_]+$/.test(k))
       .map(([k, val]) => [k.slice(4), String(val)]),
   );
   return runAction(async (actor) => {

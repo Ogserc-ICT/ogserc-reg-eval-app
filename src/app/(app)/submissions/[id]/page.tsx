@@ -3,11 +3,22 @@ import { notFound } from "next/navigation";
 import { FlagList, PaymentBadge, SlaBadge, StatusBadge } from "@/components/badges";
 import { PageHeader } from "@/components/page-header";
 import { Facts, Panel } from "@/components/panel";
+import { serviceAreaText } from "@/domain/certificate";
+import { CONDITION_KEYS, CONDITION_LABELS } from "@/domain/forms";
 import { formatNaira } from "@/domain/money";
 import { can } from "@/domain/roles";
-import { isClosed } from "@/domain/types";
+import { FILING_LABELS, STATUS, isClosed, isLinkedFiling } from "@/domain/types";
 import { db } from "@/lib/db";
-import { nairaInput, showDate, showMoney, showText } from "@/lib/format";
+import { documentStatusText, nairaInput, showDate, showMoney, showText } from "@/lib/format";
+import {
+  claimsText,
+  directorsText,
+  incidentsText,
+  licencesText,
+  shareholdersText,
+  signatoriesText,
+} from "@/server/submission-text";
+import { STATUS_FROM_DB } from "@/server/submissions";
 import { requirePermission } from "@/lib/session";
 import { toIsoDate } from "@/server/reference-data";
 import { listDocuments } from "@/server/documents";
@@ -42,11 +53,36 @@ export default async function SubmissionPage({
   const editable = (permission: Parameters<typeof can>[1]) =>
     can(user.roles, closed ? "submission.editClosed" : permission);
   const docsEditable = editable("documents.edit");
+  const x = d.details;
+  const linkedFiling = isLinkedFiling(sub.filingType);
+  const canFile =
+    can(user.roles, "submission.create") &&
+    sub.filingType === "NEW" &&
+    sub.status === STATUS.REGISTERED &&
+    !!sub.registrationNo;
+  const fileHref = (type: "UPDATE" | "ANNUAL") =>
+    `/submissions/new?filing=${type}&reg=${encodeURIComponent(sub.registrationNo ?? "")}`;
 
   return (
     <div className="space-y-4">
       <PageHeader title={row.registeredName} back={{ href: "/submissions", label: "Register" }}>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {canFile && (
+            <>
+              <Link
+                href={fileHref("UPDATE")}
+                className="border-brand-700 text-brand-700 hover:bg-brand-50 rounded border px-3 py-1.5 text-sm"
+              >
+                File an update
+              </Link>
+              <Link
+                href={fileHref("ANNUAL")}
+                className="border-brand-700 text-brand-700 hover:bg-brand-50 rounded border px-3 py-1.5 text-sm"
+              >
+                File annual confirmation
+              </Link>
+            </>
+          )}
           {editable("submission.edit") && (
             <Link
               href={`/submissions/${id}/edit`}
@@ -98,6 +134,21 @@ export default async function SubmissionPage({
           SLA <SlaBadge sla={a.sla} />
         </span>
       </div>
+      <p className="text-sm text-gray-700">
+        {FILING_LABELS[sub.filingType]} on Form <strong>{showText(sub.formFiled)}</strong>
+        {x.linkedSubmission && (
+          <>
+            {" "}
+            for{" "}
+            <Link
+              className="text-brand-700 underline"
+              href={`/submissions/${x.linkedSubmission.id}`}
+            >
+              {x.linkedSubmission.registrationNo ?? x.linkedSubmission.ackNo}
+            </Link>
+          </>
+        )}
+      </p>
 
       <section
         aria-label="Next action"
@@ -106,6 +157,67 @@ export default async function SubmissionPage({
         <p className="text-xs tracking-wide text-gray-500 uppercase">Next action</p>
         <p className="text-brand-900 font-medium">{d.nextAction}</p>
       </section>
+
+      {linkedFiling && d.filingChanges && (
+        <Panel
+          title={
+            sub.status === STATUS.APPLIED
+              ? "Changes applied to the registration"
+              : `Changes to apply on approval (${d.filingChanges.length})`
+          }
+        >
+          {sub.status === STATUS.APPLIED ? (
+            <p className="text-sm text-gray-700">
+              Applied on approval. The registration’s history lists each old and new value.
+            </p>
+          ) : d.filingChanges.length ? (
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs text-gray-500">
+                <tr>
+                  <th className="py-1 pr-2 font-normal">Field</th>
+                  <th className="py-1 pr-2 font-normal">Registered now</th>
+                  <th className="py-1 font-normal">After approval</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {d.filingChanges.map((c) => (
+                  <tr key={c.key}>
+                    <td className="py-1.5 pr-2">
+                      {c.label}
+                      {c.certificate && (
+                        <span className="block text-xs text-amber-800">On the certificate</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-2 text-gray-600">{showText(c.before)}</td>
+                    <td className="py-1.5">{showText(c.after)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-sm text-gray-700">
+              No changes: approving it confirms the registered details as they are.
+            </p>
+          )}
+        </Panel>
+      )}
+
+      {d.linkedFilings.length > 0 && (
+        <Panel title="Updates and annual confirmations">
+          <ul className="space-y-1 text-sm">
+            {d.linkedFilings.map((f) => (
+              <li key={f.id} className="flex flex-wrap items-center gap-x-3">
+                <Link className="text-brand-700 font-mono underline" href={`/submissions/${f.id}`}>
+                  {f.ackNo}
+                </Link>
+                <span>{FILING_LABELS[f.filingType]}</span>
+                <span className="text-gray-600">{showDate(toIsoDate(f.dateSubmitted))}</span>
+                <StatusBadge status={STATUS_FROM_DB[f.status]} />
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title={`Data flags (${flags.length})`}>
@@ -145,9 +257,16 @@ export default async function SubmissionPage({
                 a.categoryApplied ? `${a.categoryApplied} – ${a.categoryDescription}` : "—",
               ],
               ["Category from activity map", showText(a.categoryAuto)],
+              ["Form filed", showText(sub.formFiled)],
               [
-                "Primary / secondary activity",
-                `${showText(a.primaryCode)} / ${showText(a.secondaryCode)}`,
+                "Category confirmed",
+                sub.confirmedCategory
+                  ? `${sub.confirmedCategory}${x.categoryConfirmedBy ? ` by ${x.categoryConfirmedBy.name}` : ""}${x.categoryConfirmedOn ? `, ${showDate(toIsoDate(x.categoryConfirmedOn))}` : ""}${sub.categoryConfirmedReason ? ` – ${sub.categoryConfirmedReason}` : ""}`
+                  : "Not yet (evaluation)",
+              ],
+              [
+                "Primary / other activities",
+                `${showText(a.primaryCode)} / ${a.otherCodes.join(", ") || "none"}`,
               ],
               ["Override reason", showText(sub.overrideReason)],
               ["Registration fee", showMoney(p?.registrationFee)],
@@ -217,7 +336,7 @@ export default async function SubmissionPage({
         submissionId={id}
         documents={documents}
         roles={user.roles}
-        registered={sub.status === "Registered"}
+        registered={sub.status === STATUS.REGISTERED}
         open={!closed}
         needsReissue={row.certificateNeedsReissue}
       />
@@ -258,7 +377,7 @@ export default async function SubmissionPage({
       )}
 
       <Panel
-        title={`Documents (${a.documents.outstanding} outstanding, ${a.documents.pending} pending)`}
+        title={`Documents – ${showText(a.documentsForm)} (${a.documents.outstanding} outstanding, ${a.documents.pending} pending)`}
       >
         {docsEditable ? (
           <DocumentsForm
@@ -269,17 +388,9 @@ export default async function SubmissionPage({
         ) : (
           <ul className="space-y-1 text-sm">
             {d.documents.map((doc) => (
-              <li key={doc.number} className="flex justify-between gap-4">
-                <span>{doc.name}</span>
-                <span className="text-gray-600">
-                  {doc.value === "Y"
-                    ? "Received"
-                    : doc.value === "N"
-                      ? "Outstanding"
-                      : doc.value === "N/A"
-                        ? "N/A"
-                        : "Pending"}
-                </span>
+              <li key={doc.key} className="flex justify-between gap-4">
+                <span>{doc.text}</span>
+                <span className="text-gray-600">{documentStatusText(doc)}</span>
               </li>
             ))}
           </ul>
@@ -291,30 +402,46 @@ export default async function SubmissionPage({
           <Facts
             items={[
               ["Registrant type", showText(sub.registrantType)],
+              ["Trading name", showText(x.tradingName)],
               ["Submission channel", showText(sub.submissionChannel)],
               ["CAC number", showText(sub.cacNo)],
+              ["Date of incorporation", showDate(toIsoDate(x.incorporationDate))],
               ["TIN", showText(sub.tin)],
-              ["Address", showText(sub.address)],
-              ["Principal LGA", showText(sub.principalLga)],
-              ["Other areas served", showText(sub.otherAreasServed)],
+              ["Registered address", showText(sub.address)],
+              ["Operational address", showText(x.operationalAddress)],
+              ["Website", showText(x.website)],
+              ["Service area", serviceAreaText(sub)],
               [
                 "Installed capacity",
                 sub.installedCapacityMw === null ? "—" : `${sub.installedCapacityMw} MW`,
               ],
               ["Customers", showText(sub.customers?.toLocaleString("en-NG"))],
-              [
-                "Licence",
-                `${showText(sub.licenceStatus)}${sub.licenceNo ? `, No. ${sub.licenceNo}` : ""}`,
-              ],
-              ["Licence expiry", showDate(sub.licenceExpiry)],
+              ["Licence status", showText(sub.licenceStatus)],
+              ["Licences", showText(licencesText(x.licences))],
+              ["Nearest licence expiry", showDate(a.nearestLicenceExpiry)],
               [
                 "Operating on Effective Date",
                 sub.operatingOnEffectiveDate === "Y"
                   ? "Yes"
                   : `No – planned start ${showDate(sub.plannedStartDate)}`,
               ],
+              [
+                "Managing director",
+                [x.mdName, x.mdPhone, x.mdEmail].filter(Boolean).join(", ") || "—",
+              ],
               ["Compliance officer", showText(sub.complianceOfficer)],
               ["Phone / email", `${showText(sub.phone)} / ${showText(sub.email)}`],
+              ["Shareholders (5%+)", showText(shareholdersText(x.shareholders))],
+              ["Directors and key officers", showText(directorsText(x.directors))],
+              ["HSE incidents (24 months)", showText(incidentsText(x.hseIncidents))],
+              ["Confidentiality claims", showText(claimsText(x.confidentialityClaims))],
+              ["Signatories", showText(signatoriesText(x))],
+              [
+                "Document conditions",
+                CONDITION_KEYS.filter((k) => sub.conditions[k])
+                  .map((k) => `${CONDITION_LABELS[k]} ${sub.conditions[k] === "Y" ? "Yes" : "No"}`)
+                  .join("; ") || "—",
+              ],
               ["Entered by", row.createdBy.name],
               ["Remarks", showText(sub.remarks)],
             ]}

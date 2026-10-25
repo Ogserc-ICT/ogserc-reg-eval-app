@@ -48,10 +48,17 @@ function register(n: number, overrides: Record<string, Value> = {}): WbRow {
   });
 }
 
+/** The workbook's items with no single match on REG-01E (see legacy-documents.ts). */
+const DOC_WARNINGS = [
+  "Document 7 (Y) not imported: no matching item on the new forms; left pending",
+  "Document 9 (Y) not imported: not on REG-01E; left pending",
+  "Document 13 (Y) not imported: no matching item on the new forms; left pending",
+];
+
 const docs = (n: number, ack: string, value = "Y") =>
   row(n, {
     "Acknowledgement No.": { f: ack },
-    ...Object.fromEntries(seed.schedule2_documents.map((d, i) => [`${i + 1}. ${d}`, value])),
+    ...Object.fromEntries(seed.schedule2_documents_legacy.map((d, i) => [`${i + 1}. ${d}`, value])),
   });
 
 const evaluation = (n: number, ack: string, overrides: Record<string, Value> = {}) =>
@@ -111,9 +118,22 @@ describe("planWorkbookImport", () => {
       primaryActivityCode: "MGD",
       status: "Acknowledged - Awaiting Payment",
     });
-    expect(messages(plan, "warning")).toEqual([AWAITING_WARNING]);
+    // The 13 old items map onto REG-01E's keys. 7 and 13 have no single match on the new forms, and
+    // REG-01E has a customer list, not a customer enumeration (9).
+    expect(messages(plan, "warning")).toEqual([AWAITING_WARNING, ...DOC_WARNINGS]);
     expect(s.pricing.category).toBe("E");
-    expect(s.documents.every((d) => d === "Y")).toBe(true);
+    expect(s.data.formFiled).toBe("REG-01E");
+    expect(s.documents).toEqual({
+      incorporation: "Y",
+      constitution: "Y",
+      licences: "Y",
+      single_line_diagram: "Y",
+      asset_register: "Y",
+      financials: "Y",
+      tariff_order: "Y",
+      env_safety_permits: "Y",
+      board_resolution: "Y",
+    });
     expect(plan.pricingDifferences).toEqual([]);
     expect(plan.counters.ack).toBe(2);
   });
@@ -261,6 +281,7 @@ describe("planWorkbookImport", () => {
       'Approving officer "Nobody" is not a user with that role; left unassigned',
       'Check 2.2: "maybe" is not Y, N or N/A; left pending',
       AWAITING_WARNING,
+      ...DOC_WARNINGS,
     ]);
   });
 
@@ -276,6 +297,7 @@ describe("planWorkbookImport", () => {
       'CAC number "1234567899" is not RC/BN/IT + digits',
       'Phone "123" is not a Nigerian number',
       AWAITING_WARNING,
+      ...DOC_WARNINGS,
     ]);
   });
 

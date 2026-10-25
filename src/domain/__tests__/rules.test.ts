@@ -8,7 +8,7 @@ import {
   recommendedOutcome,
 } from "../evaluation";
 import { dataFlags, type OtherSubmission } from "../flags";
-import { ownUseFiledLate, ownUseFlags } from "../own-use";
+import { ownUseFiledLate, ownUseFlags, type OwnUseInput } from "../own-use";
 import { assessSubmission } from "../submission";
 import { FINAL_DECISION, LICENCE, STATUS } from "../types";
 import {
@@ -35,6 +35,8 @@ import {
   readySettings,
   ref,
   settings,
+  licence,
+  other as otherRow,
 } from "./helpers";
 
 const codes = (
@@ -53,18 +55,17 @@ describe("data flags (§2.12)", () => {
   });
 
   it("finds duplicates on other submissions only", () => {
-    const other = {
+    const other = otherRow({
       id: "sub-2",
       cacNo: "rc123456",
       registeredName: " example  mini-grid ltd ",
-      registrationNo: null,
-    };
+    });
     expect(codes({}, [other])).toEqual(expect.arrayContaining(["DUPLICATE_CAC", "DUPLICATE_NAME"]));
     expect(codes({}, [{ ...other, id: "sub-1" }])).toEqual([]);
   });
 
   it("finds a duplicate registration number", () => {
-    const other = { id: "sub-2", cacNo: null, registeredName: null, registrationNo: "R/1" };
+    const other = otherRow({ id: "sub-2", registrationNo: "R/1" });
     expect(
       codes(
         {
@@ -89,7 +90,7 @@ describe("data flags (§2.12)", () => {
 
   it("flags unknown activities and missing capacity", () => {
     expect(codes({ primaryActivity: "Bitcoin mining" })).toContain("UNKNOWN_ACTIVITY");
-    expect(codes({ secondaryActivity: "Bitcoin mining" })).toContain("UNKNOWN_SECONDARY_ACTIVITY");
+    expect(codes({ otherActivities: ["Bitcoin mining"] })).toContain("UNKNOWN_OTHER_ACTIVITY");
     expect(codes({ installedCapacityMw: null })).toContain("NO_CAPACITY");
     expect(codes({ primaryActivity: activity("EST"), installedCapacityMw: null })).not.toContain(
       "NO_CAPACITY",
@@ -112,7 +113,14 @@ describe("data flags (§2.12)", () => {
   });
 
   it("flags licence renewal, CPT below 1 MW, MSL licence", () => {
-    expect(codes({ licenceExpiry: addDays(ED, 100) })).toContain("LICENCE_RENEWAL");
+    expect(codes({ licences: [licence("N/1", addDays(ED, 100))] })).toContain("LICENCE_RENEWAL");
+    // The nearest expiry of several licences counts.
+    expect(
+      codes({ licences: [licence("N/1", addDays(ED, 900)), licence("N/2", addDays(ED, 100))] }),
+    ).toContain("LICENCE_RENEWAL");
+    expect(codes({ licences: [licence("N/1", addDays(ED, 900))] })).not.toContain(
+      "LICENCE_RENEWAL",
+    );
     expect(codes({ primaryActivity: activity("CPT"), installedCapacityMw: 0.8 })).toContain(
       "CPT_BELOW_1MW",
     );
@@ -124,20 +132,25 @@ describe("data flags (§2.12)", () => {
   it("flags timing problems", () => {
     expect(codes({ operatingOnEffectiveDate: "N" })).toContain("NO_START_DATE");
     expect(codes({ dateSubmitted: addDays(ED, 1) })).toContain("FUTURE_SUBMISSION");
-    const unlicensed = { licenceStatus: LICENCE.UNLICENSED, licenceNo: null };
+    const unlicensed = { licenceStatus: LICENCE.UNLICENSED, licences: [] };
     expect(codes(unlicensed, [], addDays(ED, 90))).not.toContain("LICENCE_APPLICATION_OVERDUE");
     expect(codes(unlicensed, [], addDays(ED, 91))).toContain("LICENCE_APPLICATION_OVERDUE");
   });
 
   it("flags contradictory licence data (new rules)", () => {
-    expect(codes({ licenceStatus: LICENCE.UNLICENSED, licenceNo: "X1" })).toContain(
+    expect(codes({ licenceStatus: LICENCE.UNLICENSED, licences: [licence("X1")] })).toContain(
       "LICENCE_NO_WITHOUT_LICENCE",
     );
-    expect(codes({ licenceStatus: LICENCE.PENDING, licenceNo: "X1" })).toContain(
+    expect(codes({ licenceStatus: LICENCE.PENDING, licences: [licence("X1")] })).toContain(
       "LICENCE_NO_WITHOUT_LICENCE",
     );
-    expect(codes({ licenceNo: null })).toContain("LICENCE_NO_MISSING");
-    expect(codes({ licenceStatus: LICENCE.UNLICENSED, licenceNo: null })).not.toContain(
+    expect(codes({ licences: [] })).toContain("LICENCE_NO_MISSING");
+    // A licence row without a number does not count as a number.
+    expect(codes({ licences: [licence(null)] })).toContain("LICENCE_NO_MISSING");
+    expect(codes({ licences: [licence(null), licence("N/2")] })).not.toContain(
+      "LICENCE_NO_MISSING",
+    );
+    expect(codes({ licenceStatus: LICENCE.UNLICENSED, licences: [] })).not.toContain(
       "LICENCE_NO_MISSING",
     );
   });
@@ -166,12 +179,12 @@ describe("evaluation auto checks (§6)", () => {
   const value = (checks: ReturnType<typeof evaluate>["checks"], id: string) =>
     checks.find((c) => c.id === id);
 
-  it("counts 55 decision checks", () => {
-    expect(evaluate().counts.total).toBe(55);
+  it("counts 56 decision checks", () => {
+    expect(evaluate().counts.total).toBe(56);
   });
 
   it("marks 2.4 and 4.2 N/A when Unlicensed (new rule)", () => {
-    const sub = makeSubmission({ licenceStatus: LICENCE.UNLICENSED, licenceNo: null });
+    const sub = makeSubmission({ licenceStatus: LICENCE.UNLICENSED, licences: [] });
     const { checks } = evaluate({ sub });
     expect(value(checks, "2.4")).toMatchObject({ value: "N/A", mode: "auto-na" });
     expect(value(checks, "4.2")).toMatchObject({ value: "N/A", mode: "auto-na" });
@@ -196,7 +209,7 @@ describe("evaluation auto checks (§6)", () => {
     const cpt = makeSubmission({ primaryActivity: activity("CPT"), installedCapacityMw: 0.5 });
     expect(value(evaluate({ sub: cpt }).checks, "1.4")?.value).toBe("N");
     const dup = evaluate({
-      others: [{ id: "x", cacNo: "RC123456", registeredName: null, registrationNo: null }],
+      others: [otherRow({ id: "x", cacNo: "RC123456" })],
     });
     expect(value(dup.checks, "1.5")?.value).toBe("N");
   });
@@ -222,9 +235,15 @@ describe("evaluation auto checks (§6)", () => {
     expect(value(evaluate().checks, "3.1")?.value).toBe("N/A");
     expect(value(evaluate({ payments: [] }).checks, "5.5")?.value).toBe("N");
     expect(value(evaluate().checks, "4.3")?.value).toBe("N/A");
-    const expiring = makeSubmission({ licenceExpiry: addDays(ED, 30), documents: allDocs("Y") });
+    const expiring = makeSubmission({
+      licences: [licence("N/1", addDays(ED, 30))],
+      documents: allDocs("Y"),
+    });
     expect(value(evaluate({ sub: expiring }).checks, "4.3")?.value).toBe("N");
-    const fine = makeSubmission({ licenceExpiry: addDays(ED, 400), documents: allDocs("Y") });
+    const fine = makeSubmission({
+      licences: [licence("N/1", addDays(ED, 400))],
+      documents: allDocs("Y"),
+    });
     expect(value(evaluate({ sub: fine }).checks, "4.3")?.value).toBe("Y");
   });
 
@@ -238,7 +257,7 @@ describe("evaluation auto checks (§6)", () => {
     const flagged = makeSubmission({
       documents: allDocs("Y"),
       dateSubmissionComplete: ED,
-      licenceNo: null,
+      licences: [],
     });
     expect(value(evaluate({ sub: flagged }).checks, "7.6")?.value).toBe("N");
     const explained = evaluate({
@@ -344,7 +363,7 @@ describe("workflow guards (§4, §5)", () => {
     const flagged = makeSubmission({
       documents: allDocs("Y"),
       dateSubmissionComplete: ED,
-      licenceNo: null,
+      licences: [],
     });
     const blocked = approvalBlockers(evaluate({ sub: flagged }).approval);
     expect(blocked.some((r) => r.includes("unresolved data flag"))).toBe(true);
@@ -450,15 +469,25 @@ describe("workflow guards (§4, §5)", () => {
 });
 
 describe("own-use notifications (§4.3)", () => {
-  const base = {
+  const unit = (capacityKw: number) => ({
+    makeModel: null,
+    capacityKw,
+    fuel: "Diesel",
+    avgMonthlyMwh: null,
+  });
+  const base: OwnUseInput = {
     id: "o1",
     ounNo: "OGSERC/OUN/2026/0001",
     name: "Factory Ltd",
     dateFiled: ED,
     cacNo: "RC1",
+    siteAddress: "Plot 1, Ifo Industrial Estate",
     lga: "Ifo",
-    installedCapacityKw: 650,
+    units: [unit(400), unit(250)],
+    documents: {},
     pricing: null,
+    registrationNo: null,
+    certificateIssueDate: null,
   };
   const flagCtx = (over: Partial<Parameters<typeof ownUseFlags>[1]> = {}) => ({
     otherNotifications: [],
@@ -471,20 +500,36 @@ describe("own-use notifications (§4.3)", () => {
 
   it("flags an unpaid fee until the Category I fee is paid", () => {
     expect(ownUseFlags(base, flagCtx()).map((f) => f.code)).toEqual(["FEE_UNPAID"]);
-    expect(ownUseFlags(base, flagCtx({ payments: [payment(base.ounNo, 100_000)] }))).toEqual([]);
-    expect(ownUseFlags({ ...base, installedCapacityKw: 150 }, flagCtx())).toEqual([]);
+    expect(ownUseFlags(base, flagCtx({ payments: [payment(base.ounNo!, 100_000)] }))).toEqual([]);
+    expect(ownUseFlags({ ...base, units: [unit(100), unit(50)] }, flagCtx())).toEqual([]);
   });
 
-  it("flags duplicates and missing fields", () => {
+  it("flags the same CAC and site address, missing fields and a CAC on the Register", () => {
     const flags = ownUseFlags(
       { ...base, lga: null },
       flagCtx({
-        otherNotifications: [{ ...base, id: "o2" }],
+        otherNotifications: [{ ...base, id: "o2", siteAddress: " plot 1,  ifo industrial estate" }],
         registerCacNos: ["rc1"],
-        payments: [payment(base.ounNo, 100_000)],
+        payments: [payment(base.ounNo!, 100_000)],
       }),
     ).map((f) => f.code);
-    expect(flags).toEqual(["MISSING_REQUIRED", "DUPLICATE_CAC", "CAC_ON_REGISTER"]);
+    expect(flags).toEqual(["MISSING_REQUIRED", "DUPLICATE_SITE", "CAC_ON_REGISTER"]);
+  });
+
+  it("allows one registrant several sites (no duplicate-CAC flag between notifications)", () => {
+    const flags = ownUseFlags(
+      base,
+      flagCtx({
+        otherNotifications: [{ ...base, id: "o2", siteAddress: "Plot 9, Sagamu Interchange" }],
+        payments: [payment(base.ounNo!, 100_000)],
+      }),
+    );
+    expect(flags).toEqual([]);
+  });
+
+  it("needs at least one generator unit", () => {
+    const flags = ownUseFlags({ ...base, units: [] }, flagCtx()).map((f) => f.message);
+    expect(flags).toContain("Missing required field: generator units");
   });
 
   it("shows filed after the existing-operator deadline", () => {

@@ -5,7 +5,8 @@ import { isClosed } from "@/domain/types";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { loadFormOptions } from "@/server/options";
-import { toIsoDate } from "@/server/reference-data";
+import { submissionFormValues } from "@/server/submission-form-values";
+import { childrenInclude } from "@/server/submission-text";
 import { STATUS_FROM_DB } from "@/server/submissions";
 import { updateSubmissionAction } from "../../actions";
 import { SubmissionForm } from "../../submission-form";
@@ -14,7 +15,10 @@ export default async function EditSubmissionPage({ params }: { params: Promise<{
   const user = await requirePermission("records.read");
   const { id } = await params;
   const [row, options] = await Promise.all([
-    db.submission.findUnique({ where: { id } }),
+    db.submission.findUnique({
+      where: { id },
+      include: { ...childrenInclude, linkedSubmission: { select: { registrationNo: true } } },
+    }),
     loadFormOptions(db),
   ]);
   if (!row) notFound();
@@ -23,34 +27,6 @@ export default async function EditSubmissionPage({ params }: { params: Promise<{
   const closed = isClosed(status);
   if (!can(user.roles, closed ? "submission.editClosed" : "submission.edit"))
     redirect("/forbidden");
-
-  const s = (v: string | null) => v ?? "";
-  const initial = {
-    registeredName: row.registeredName,
-    dateSubmitted: toIsoDate(row.dateSubmitted),
-    submissionChannel: s(row.submissionChannel),
-    registrantType: s(row.registrantType),
-    cacNo: s(row.cacNo),
-    tin: s(row.tin),
-    address: s(row.address),
-    principalLga: row.principalLga,
-    otherAreasServed: s(row.otherAreasServed),
-    primaryActivityCode: row.primaryActivityCode,
-    secondaryActivityCode: s(row.secondaryActivityCode),
-    installedCapacityMw: row.installedCapacityMw?.toString() ?? "",
-    customers: row.customers?.toString() ?? "",
-    licenceStatus: row.licenceStatus,
-    licenceNo: s(row.licenceNo),
-    licenceExpiry: s(toIsoDate(row.licenceExpiry)),
-    complianceOfficer: s(row.complianceOfficer),
-    phone: s(row.phone),
-    email: s(row.email),
-    operatingOnEffectiveDate: row.operatingOnEffectiveDate ? "Y" : "N",
-    plannedStartDate: s(toIsoDate(row.plannedStartDate)),
-    categoryOverride: s(row.categoryOverride),
-    overrideReason: s(row.overrideReason),
-    remarks: s(row.remarks),
-  };
 
   return (
     <div>
@@ -67,7 +43,7 @@ export default async function EditSubmissionPage({ params }: { params: Promise<{
         mode="edit"
         action={updateSubmissionAction.bind(null, id)}
         options={options}
-        initial={initial}
+        initial={submissionFormValues(row, row.linkedSubmission?.registrationNo ?? null)}
         closedStatus={closed ? status : undefined}
       />
     </div>

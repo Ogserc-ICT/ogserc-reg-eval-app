@@ -20,7 +20,7 @@ export interface SubmissionSubject {
 
 export type OfficerField = "evaluatingOfficerId" | "reviewingSupervisorId" | "approvingOfficerId";
 
-export type Outcome = "Registered" | "Refused" | "Lapsed" | "Cancelled";
+export type Outcome = "Registered" | "Refused" | "Lapsed" | "Cancelled" | "Changes Applied";
 
 export type NotificationEvent =
   | { kind: "submissionCreated"; sub: SubmissionSubject }

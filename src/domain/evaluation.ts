@@ -6,6 +6,7 @@ import {
   FINAL_DECISION,
   LICENCE,
   STATUS,
+  isLinkedFiling,
   type CheckValue,
   type EvaluationInput,
   type FinalDecision,
@@ -48,6 +49,20 @@ export interface AutoCheckContext {
 
 type Rule = { mode: "auto"; value: CheckValue } | { mode: "na-unless"; applies: boolean };
 
+/**
+ * Check 1.10, "Form filed matches the confirmed category": pending until the evaluator confirms the
+ * category. A mismatch passes only when wrong forms are accepted and re-categorised with a reason;
+ * otherwise it fails, so the applicant is asked to file on the right form.
+ */
+export function formFiledCheck(sub: SubmissionInput, a: Assessment, c: DomainContext): CheckValue {
+  if (!a.formCategory) return "N";
+  if (!sub.confirmedCategory) return null;
+  if (a.formCategory === sub.confirmedCategory) return "Y";
+  const accepted =
+    c.settings.policy.wrongFormHandling === "ACCEPT" && !!sub.categoryConfirmedReason?.trim();
+  return accepted ? "Y" : "N";
+}
+
 /** §6: rule for each automatic check; checks with no rule are manual. */
 function autoRules(c: AutoCheckContext): Record<string, Rule> {
   const { sub, assessment: a } = c;
@@ -59,6 +74,8 @@ function autoRules(c: AutoCheckContext): Record<string, Rule> {
   const multiState = a.primaryCode === "MSL" || sub.licenceStatus === LICENCE.MULTI_STATE;
   const lateCheck: CheckValue = a.daysLate === 0 ? "N/A" : yn(a.fees.lateCharge > 0);
   const docsComplete = a.documents.documentsComplete;
+  // Updates and annual confirmations get no new number or certificate (para 16).
+  const linked = isLinkedFiling(sub.filingType);
 
   return {
     "1.1": auto(yn(!!sub.ackNo)),
@@ -68,6 +85,7 @@ function autoRules(c: AutoCheckContext): Record<string, Rule> {
     "1.7": naUnless(multiState),
     "1.8": auto(yn(a.daysLate === 0)),
     "1.9": auto(lateCheck),
+    "1.10": auto(formFiledCheck(sub, a, c.ctx)),
     // New (§6): no licence, so nothing to list or confirm.
     "2.4": naUnless(!unlicensed),
     "3.0": auto(yn(docsComplete)),
@@ -75,10 +93,10 @@ function autoRules(c: AutoCheckContext): Record<string, Rule> {
     "3.2": naUnless(!!sub.registrantType && sub.registrantType !== "Company"),
     "4.2": naUnless(!unlicensed),
     "4.3": auto(
-      sub.licenceExpiry
+      a.nearestLicenceExpiry
         ? yn(
             !licenceNeedsRenewal(
-              sub.licenceExpiry,
+              a.nearestLicenceExpiry,
               a.effectiveDate,
               c.ctx.settings.licenceExpiryWindowDays,
             ),
@@ -93,8 +111,13 @@ function autoRules(c: AutoCheckContext): Record<string, Rule> {
     "7.3": naUnless(multiState),
     "7.5": auto("N/A"),
     "7.6": auto(yn(c.flags.length === 0 || c.flagsExplained)),
-    "9.1": auto(sub.certificateIssueDate && sub.status === STATUS.REGISTERED ? "Y" : null),
-    "9.2": auto(sub.registrationNo ? "Y" : null),
+    "9.1": linked
+      ? auto("N/A")
+      : auto(sub.certificateIssueDate && sub.status === STATUS.REGISTERED ? "Y" : null),
+    "9.2": linked ? auto("N/A") : auto(sub.registrationNo ? "Y" : null),
+    "9.3": naUnless(!linked),
+    "9.4": naUnless(!linked),
+    "9.5": naUnless(!linked),
   };
 }
 
@@ -109,6 +132,7 @@ export const AUTOMATIC_CHECK_IDS: readonly string[] = [
   "1.5",
   "1.8",
   "1.9",
+  "1.10",
   "3.0",
   "4.3",
   "5.4",
@@ -209,12 +233,13 @@ export function recommendedOutcome(
     return FINAL_DECISION.PROVISIONAL;
   if (counts.failed > 0) return FINAL_DECISION.DEFICIENCY;
   if (counts.pending > 0) return "Evaluation in progress";
-  return FINAL_DECISION.REGISTER;
+  return isLinkedFiling(sub.filingType) ? FINAL_DECISION.APPLY : FINAL_DECISION.REGISTER;
 }
 
 /**
  * Whether a check may be changed now. Automatic checks never; decision checks (stages 1–7) only until
- * a final decision is recorded; post-approval checks (9.x) only once the submission is Registered.
+ * a final decision is recorded; post-approval checks (9.x) only once the submission is Registered (or,
+ * for an update or annual confirmation, its changes are applied).
  */
 export function checkIsEditable(
   check: EffectiveCheck,
@@ -222,6 +247,6 @@ export function checkIsEditable(
   status: Status | null,
 ): boolean {
   if (check.mode !== "manual") return false;
-  if (check.postApproval) return status === STATUS.REGISTERED;
+  if (check.postApproval) return status === STATUS.REGISTERED || status === STATUS.APPLIED;
   return !finalDecision;
 }

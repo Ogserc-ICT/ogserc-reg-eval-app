@@ -68,6 +68,7 @@ async function openEvaluation(page: Page, name: string) {
 
 async function newSubmission(page: Page, name: string, cac: string) {
   await page.goto("/submissions/new");
+  await page.getByLabel(/^Form filed/).selectOption("REG-01E");
   await page.getByLabel(/^Registered name/).fill(name);
   await page.getByLabel("CAC number").fill(cac);
   await page.getByLabel(/^Principal LGA/).selectOption("Odeda");
@@ -76,7 +77,8 @@ async function newSubmission(page: Page, name: string, cac: string) {
   await page
     .getByLabel(/^Licence status/)
     .selectOption("NERC registration/permit (mini-grid/captive)");
-  await page.getByLabel("Licence number").fill("NERC/MG/77");
+  await page.getByRole("button", { name: "+ Add licence" }).click();
+  await page.getByLabel("Number, row 1").fill("NERC/MG/77");
   await page.getByRole("button", { name: "Save submission" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
 }
@@ -128,8 +130,8 @@ test.describe.serial("Phase 4: evaluation and workflow", () => {
   test("registry intake: documents and fee", async ({ browser }) => {
     const page = await as(browser, "registry");
     await newSubmission(page, SOLAR, "RC778899");
-    for (let n = 1; n <= 13; n++) {
-      await page.getByRole("radio", { name: new RegExp(`^${n}\\. .*: Received$`) }).check();
+    for (const radio of await page.getByRole("radio", { name: /: Received$/ }).all()) {
+      await radio.check();
     }
     await page.getByRole("button", { name: "Save checklist" }).click();
     await expect(page.getByText(/^Checklist saved/)).toBeVisible();
@@ -180,8 +182,12 @@ test.describe.serial("Phase 4: evaluation and workflow", () => {
   test("evaluator answers the checks and marks the submission complete", async ({ browser }) => {
     const page = await as(browser, "evaluator");
     await openEvaluation(page, SOLAR);
+    // Category confirmed (check 1.10): the form filed, REG-01E, is right.
+    await page.getByRole("button", { name: "Confirm category" }).click();
+    await expect(page.getByText("Category E confirmed.")).toBeVisible();
     // Automatic checks show no radios.
     await expect(page.getByRole("radio", { name: "1.1: Y" })).toHaveCount(0);
+    await expect(page.getByRole("radio", { name: "1.10: Y" })).toHaveCount(0);
     const yes = page.getByRole("radio", { name: /^\d+\.\d+: Y$/ });
     const count = await yes.count();
     expect(count).toBeGreaterThan(20);

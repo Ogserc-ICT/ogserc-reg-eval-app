@@ -1,8 +1,11 @@
 import { can } from "@/domain/roles";
+import { serviceAreaText } from "@/domain/certificate";
 import { STATUS } from "@/domain/types";
 import { loadContext } from "./context";
 import { ForbiddenError } from "./errors";
 import { loadEvaluationState } from "./evaluation-state";
+import { OWN_USE_CATEGORY } from "@/domain/own-use";
+import { toIsoDate } from "./reference-data";
 import type { Actor, Db } from "./types";
 
 export type Verdict = "current" | "provisional" | "not-valid" | "not-registered";
@@ -48,9 +51,50 @@ export async function getVerification(db: Db, actor: Actor, submissionId: string
     cacNo: sub.cacNo,
     category: a.categoryApplied ? `${a.categoryApplied} — ${a.categoryDescription ?? ""}` : null,
     primaryActivity: sub.primaryActivity,
-    area: [sub.principalLga, sub.otherAreasServed].filter(Boolean).join("; "),
+    area: serviceAreaText(sub),
     certificateIssueDate: sub.certificateIssueDate,
     certificateNeedsReissue: row.certificateNeedsReissue,
+    certificates,
+  };
+}
+
+export type Verification = NonNullable<Awaited<ReturnType<typeof getVerification>>>;
+
+/** The same for an own-use notification registered with a certificate (REG-01I). */
+export async function getOwnUseVerification(
+  db: Db,
+  actor: Actor,
+  id: string,
+): Promise<Verification | null> {
+  if (!can(actor.roles, "records.read")) throw new ForbiddenError();
+  const row = await db.ownUseNotification.findUnique({ where: { id } });
+  if (!row) return null;
+  const ctx = await loadContext(db);
+  const certificates = await db.generatedDocument.findMany({
+    where: { ownUseNotificationId: id, kind: "CERTIFICATE" },
+    orderBy: { version: "desc" },
+    select: {
+      id: true,
+      version: true,
+      createdAt: true,
+      supersededAt: true,
+      note: true,
+      sha256: true,
+    },
+  });
+  const category = ctx.ref.fees.find((f) => f.category === OWN_USE_CATEGORY);
+  return {
+    id,
+    verdict: row.registrationNo ? "current" : "not-registered",
+    status: row.registrationNo ? STATUS.REGISTERED : STATUS.RECEIVED,
+    registrationNo: row.registrationNo,
+    name: row.name,
+    cacNo: row.cacNo,
+    category: category ? `${category.category} — ${category.description}` : null,
+    primaryActivity: "Own-use generation (Form REG-01I)",
+    area: [row.lga, row.siteAddress].filter(Boolean).join("; "),
+    certificateIssueDate: toIsoDate(row.certificateIssueDate),
+    certificateNeedsReissue: false,
     certificates,
   };
 }

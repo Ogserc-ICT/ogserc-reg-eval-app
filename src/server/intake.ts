@@ -2,13 +2,16 @@ import type { Prisma, Submission } from "@prisma/client";
 import { categoryAuto, overrideNeedsReason } from "@/domain/category";
 import { daysLate } from "@/domain/deadlines";
 import { lateChargeFor } from "@/domain/fees";
+import { CONDITION_KEYS, type Conditions } from "@/domain/forms";
 import { formatDate } from "@/domain/dates";
 import { formatNaira } from "@/domain/money";
 import { formatAckNo } from "@/domain/numbers";
 import { can } from "@/domain/roles";
-import { STATUS, isClosed } from "@/domain/types";
+import { assessSubmission } from "@/domain/submission";
+import { FILING_LABELS, STATUS, isClosed, isLinkedFiling } from "@/domain/types";
 import { isValidTin } from "@/domain/validation";
 import {
+  CONDITION_FIELDS,
   documentsSchema,
   intakeSchema,
   submissionSchema,
@@ -28,7 +31,22 @@ import {
 import { releaseIfCleared } from "./finance";
 import { priceNewSubmission } from "./pricing";
 import { fromIsoDate, koboToNumber, loadList, toIsoDate } from "./reference-data";
-import { STATUS_FROM_DB, pricingFromColumns } from "./submissions";
+import {
+  CHECK_TO_DB,
+  STATUS_FROM_DB,
+  conditionsToColumns,
+  loadSubmission,
+  pricingFromColumns,
+} from "./submissions";
+import {
+  childrenInclude,
+  claimsText,
+  columnText,
+  directorsText,
+  incidentsText,
+  licencesText,
+  shareholdersText,
+} from "./submission-text";
 import type { Actor, Db, Tx } from "./types";
 
 export const CONFIRM_DUPLICATE_CAC = "confirmDuplicateCac";
@@ -36,28 +54,35 @@ export const CONFIRM_DUPLICATE_CAC = "confirmDuplicateCac";
 type FieldErrors = Record<string, string[]>;
 
 /**
- * Checks that need the database or today's date: list values, activities, LGA, TIN format,
- * category override and its reason. Returns the activity names for domain calculations.
+ * Checks that need the database or today's date: list values, activities, LGAs, form filed, TIN
+ * format, category override and its reason, and the registration an update links to. Returns the
+ * activity names for domain calculations and the linked registration.
  */
-async function checkAgainstReferenceData(tx: Tx, v: SubmissionFields) {
-  const ctx = await loadContext(tx);
+async function checkAgainstReferenceData(tx: Tx, v: SubmissionFields, today?: string) {
+  const ctx = await loadContext(tx, today);
   const errors: FieldErrors = {};
   const fail = (field: string, message: string) => (errors[field] ??= []).push(message);
 
-  const [lga, primary, secondary, licences, channels, types] = await Promise.all([
-    tx.lga.findUnique({ where: { name: v.principalLga } }),
-    tx.activity.findUnique({ where: { code: v.primaryActivityCode } }),
-    v.secondaryActivityCode
-      ? tx.activity.findUnique({ where: { code: v.secondaryActivityCode } })
-      : null,
+  const codes = [v.primaryActivityCode, ...v.otherActivityCodes];
+  const [lgas, activities, form, licences, channels, types] = await Promise.all([
+    tx.lga.findMany({ select: { name: true } }),
+    tx.activity.findMany({ where: { code: { in: codes } } }),
+    tx.registrationForm.findUnique({ where: { form: v.formFiled } }),
     loadList(tx, "licence_statuses"),
     loadList(tx, "submission_channels"),
     loadList(tx, "registrant_types"),
   ]);
-  if (!lga) fail("principalLga", "Choose an LGA from the list");
+  const lgaNames = new Set(lgas.map((l) => l.name));
+  const activityByCode = new Map(activities.map((a) => [a.code, a]));
+  const primary = activityByCode.get(v.primaryActivityCode);
+  if (!lgaNames.has(v.principalLga)) fail("principalLga", "Choose an LGA from the list");
+  const unknownLgas = v.lgasServed.filter((l) => !lgaNames.has(l));
+  if (unknownLgas.length) fail("lgasServed", `Not in the LGA list: ${unknownLgas.join(", ")}`);
   if (!primary) fail("primaryActivityCode", "Choose an activity from the list");
-  if (v.secondaryActivityCode && !secondary)
-    fail("secondaryActivityCode", "Choose an activity from the list");
+  const unknown = v.otherActivityCodes.filter((c) => !activityByCode.has(c));
+  if (unknown.length)
+    fail("otherActivityCodes", `Not in the activities list: ${unknown.join(", ")}`);
+  if (!form) fail("formFiled", "Choose a form from the list");
   if (!licences.includes(v.licenceStatus))
     fail("licenceStatus", "Choose a licence status from the list");
   if (v.submissionChannel && !channels.includes(v.submissionChannel))
@@ -65,12 +90,32 @@ async function checkAgainstReferenceData(tx: Tx, v: SubmissionFields) {
   if (v.registrantType && !types.includes(v.registrantType))
     fail("registrantType", "Choose from the list");
   if (v.dateSubmitted > ctx.today) fail("dateSubmitted", "Cannot be in the future");
+  if (v.incorporationDate && v.incorporationDate > ctx.today)
+    fail("incorporationDate", "Cannot be in the future");
   if (v.tin && !isValidTin(v.tin, ctx.settings.policy.tinPattern))
     fail("tin", "TIN format is not valid");
 
+  // Updates and annual confirmations quote the registration number of a Registered record.
+  let linked: Submission | null = null;
+  if (isLinkedFiling(v.filingType) && v.linkedRegistrationNo) {
+    linked = await tx.submission.findFirst({
+      where: { registrationNo: v.linkedRegistrationNo, filingType: "NEW" },
+    });
+    if (!linked) {
+      fail("linkedRegistrationNo", "No registered submission has this registration number");
+    } else if (linked.status !== "REGISTERED") {
+      fail(
+        "linkedRegistrationNo",
+        `${linked.registrationNo} is ${STATUS_FROM_DB[linked.status]}; only a Registered record can be updated or confirmed`,
+      );
+    }
+  }
+
   const names = {
     primaryActivity: primary?.name ?? null,
-    secondaryActivity: secondary?.name ?? null,
+    otherActivities: v.otherActivityCodes
+      .map((c) => activityByCode.get(c)?.name)
+      .filter((n): n is string => !!n),
   };
   if (v.categoryOverride) {
     const row = ctx.ref.fees.find((f) => f.category === v.categoryOverride);
@@ -80,7 +125,11 @@ async function checkAgainstReferenceData(tx: Tx, v: SubmissionFields) {
         "Choose a Schedule 3 category (Category I is for own-use notifications only)",
       );
     } else {
-      const auto = categoryAuto({ ...names, installedCapacityMw: v.installedCapacityMw }, ctx.ref);
+      const auto = categoryAuto(
+        { ...names, installedCapacityMw: v.installedCapacityMw },
+        ctx.ref,
+        ctx.settings.policy,
+      );
       if (overrideNeedsReason(v.categoryOverride, auto, v.overrideReason)) {
         fail("overrideReason", `Give a reason for overriding Category ${auto ?? "(none)"}`);
       }
@@ -89,19 +138,32 @@ async function checkAgainstReferenceData(tx: Tx, v: SubmissionFields) {
 
   if (Object.keys(errors).length)
     throw new ValidationError("Please correct the highlighted fields.", errors);
-  return { ctx, names };
+  return { ctx, names, linked };
 }
 
-/** One registration per person (para 11(4)): warn on a CAC number already on the Register. */
+/**
+ * One registration per person (para 11(4)): warn on a CAC number already on the Register. A
+ * registration's own updates and annual confirmations (its "family") share its CAC number by design.
+ */
 async function checkDuplicateCac(
   tx: Tx,
   cacNo: string | null,
+  family: string | null,
   exceptId: string | null,
   confirmed: boolean,
 ) {
   if (!cacNo) return false;
+  const familyFilter: Prisma.SubmissionWhereInput[] = family
+    ? [
+        { id: { not: family } },
+        { OR: [{ linkedSubmissionId: null }, { linkedSubmissionId: { not: family } }] },
+      ]
+    : [];
   const other = await tx.submission.findFirst({
-    where: { cacNo, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    where: {
+      cacNo,
+      AND: [...familyFilter, ...(exceptId ? [{ id: { not: exceptId } }] : [])],
+    },
     select: { ackNo: true, registeredName: true },
   });
   if (!other) return false;
@@ -115,27 +177,48 @@ async function checkDuplicateCac(
   return true;
 }
 
+function conditionsOf(v: SubmissionFields): Conditions {
+  const values = v as unknown as Record<string, "Y" | "N" | null>;
+  return Object.fromEntries(
+    CONDITION_KEYS.map((k) => [k, values[CONDITION_FIELDS[k]] ?? null]),
+  ) as Conditions;
+}
+
+/** Scalar columns entered at intake (not the filing type or link, which never change). */
 function submissionData(v: SubmissionFields) {
   return {
+    formFiled: v.formFiled,
     registeredName: v.registeredName,
+    tradingName: v.tradingName,
     dateSubmitted: fromIsoDate(v.dateSubmitted),
     submissionChannel: v.submissionChannel,
     registrantType: v.registrantType,
     cacNo: v.cacNo,
+    incorporationDate: fromIsoDate(v.incorporationDate),
     tin: v.tin,
     address: v.address,
+    operationalAddress: v.operationalAddress,
+    website: v.website,
     principalLga: v.principalLga,
+    lgasServed: v.lgasServed,
     otherAreasServed: v.otherAreasServed,
     primaryActivityCode: v.primaryActivityCode,
-    secondaryActivityCode: v.secondaryActivityCode,
     installedCapacityMw: v.installedCapacityMw,
     customers: v.customers,
     licenceStatus: v.licenceStatus,
-    licenceNo: v.licenceNo,
-    licenceExpiry: fromIsoDate(v.licenceExpiry),
+    mdName: v.mdName,
+    mdPhone: v.mdPhone,
+    mdEmail: v.mdEmail,
     complianceOfficer: v.complianceOfficer,
     phone: v.phone,
     email: v.email,
+    signatory1Name: v.signatory1Name,
+    signatory1Designation: v.signatory1Designation,
+    signatory1Date: fromIsoDate(v.signatory1Date),
+    signatory2Name: v.signatory2Name,
+    signatory2Designation: v.signatory2Designation,
+    signatory2Date: fromIsoDate(v.signatory2Date),
+    ...conditionsToColumns(conditionsOf(v)),
     operatingOnEffectiveDate: v.operatingOnEffectiveDate === "Y",
     plannedStartDate: fromIsoDate(v.plannedStartDate),
     categoryOverride: v.categoryOverride,
@@ -144,12 +227,96 @@ function submissionData(v: SubmissionFields) {
   } satisfies Partial<Prisma.SubmissionUncheckedCreateInput>;
 }
 
-/** §4.1 Save submission (intake). */
+/** The child tables as they will be stored (sortOrder = position on the form). */
+function childRows(v: SubmissionFields) {
+  return {
+    otherActivities: v.otherActivityCodes.map((activityCode, i) => ({
+      activityCode,
+      sortOrder: i + 1,
+    })),
+    licences: v.licences.map((l, i) => ({
+      sortOrder: i + 1,
+      type: l.type,
+      issuingAuthority: l.issuingAuthority,
+      number: l.number,
+      issueDate: fromIsoDate(l.issueDate),
+      expiryDate: fromIsoDate(l.expiryDate),
+      activityCovered: l.activityCovered,
+    })),
+    shareholders: v.shareholders.map((h, i) => ({
+      sortOrder: i + 1,
+      name: h.name,
+      nationality: h.nationality,
+      percentHolding: h.percentHolding,
+      beneficialOwner: h.beneficialOwner === null ? null : h.beneficialOwner === "Y",
+    })),
+    directors: v.directors.map((d, i) => ({ sortOrder: i + 1, ...d })),
+    confidentialityClaims: v.confidentialityClaims.map((c, i) => ({ sortOrder: i + 1, ...c })),
+    hseIncidents: v.hseIncidents.map((h, i) => ({
+      sortOrder: i + 1,
+      date: fromIsoDate(h.date),
+      location: h.location,
+      type: h.type,
+      description: h.description,
+    })),
+  };
+}
+
+type Children = ReturnType<typeof childRows>;
+
+/** Replace a submission's child tables (rows are re-created in form order). */
+export async function writeChildren(tx: Tx, submissionId: string, c: Children) {
+  const owned = { where: { submissionId } };
+  await Promise.all([
+    tx.submissionActivity.deleteMany(owned),
+    tx.submissionLicence.deleteMany(owned),
+    tx.submissionShareholder.deleteMany(owned),
+    tx.submissionDirector.deleteMany(owned),
+    tx.submissionConfidentiality.deleteMany(owned),
+    tx.submissionHseIncident.deleteMany(owned),
+  ]);
+  const withOwner = <T extends object>(rows: T[]) => rows.map((r) => ({ ...r, submissionId }));
+  await Promise.all([
+    tx.submissionActivity.createMany({ data: withOwner(c.otherActivities) }),
+    tx.submissionLicence.createMany({ data: withOwner(c.licences) }),
+    tx.submissionShareholder.createMany({
+      data: withOwner(c.shareholders).map((h) => ({
+        ...h,
+        percentHolding: h.percentHolding === null ? null : h.percentHolding.toString(),
+      })),
+    }),
+    tx.submissionDirector.createMany({ data: withOwner(c.directors) }),
+    tx.submissionConfidentiality.createMany({ data: withOwner(c.confidentialityClaims) }),
+    tx.submissionHseIncident.createMany({ data: withOwner(c.hseIncidents) }),
+  ]);
+}
+
+/** The child tables as text, for the audit entry (old → new). */
+function childrenText(c: {
+  otherActivities: { activityCode: string }[];
+  licences: Parameters<typeof licencesText>[0];
+  shareholders: Parameters<typeof shareholdersText>[0];
+  directors: Parameters<typeof directorsText>[0];
+  confidentialityClaims: Parameters<typeof claimsText>[0];
+  hseIncidents: Parameters<typeof incidentsText>[0];
+}) {
+  return {
+    otherActivities: columnText(c.otherActivities.map((a) => a.activityCode)),
+    licences: licencesText(c.licences),
+    shareholders: shareholdersText(c.shareholders),
+    directors: directorsText(c.directors),
+    confidentialityClaims: claimsText(c.confidentialityClaims),
+    hseIncidents: incidentsText(c.hseIncidents),
+  };
+}
+
+/** §4.1 Save submission (intake): a new registration, an update or an annual confirmation. */
 export async function createSubmission(
   db: Db,
   actor: Actor,
   input: unknown,
-  opts: { confirmDuplicateCac?: boolean } = {},
+  /** `today` (Lagos) is for tests; it defaults to the app's clock. */
+  opts: { confirmDuplicateCac?: boolean; today?: string } = {},
 ) {
   if (!can(actor.roles, "submission.create")) throw new ForbiddenError();
   const parsed = intakeSchema.safeParse(input);
@@ -157,7 +324,7 @@ export async function createSubmission(
   const v = parsed.data;
 
   return db.$transaction(async (tx) => {
-    const { ctx, names } = await checkAgainstReferenceData(tx, v);
+    const { ctx, names, linked } = await checkAgainstReferenceData(tx, v, opts.today);
 
     if (v.evaluatingOfficerId) {
       const officer = await tx.user.findUnique({ where: { id: v.evaluatingOfficerId } });
@@ -167,9 +334,16 @@ export async function createSubmission(
         });
       }
     }
-    const duplicate = await checkDuplicateCac(tx, v.cacNo, null, !!opts.confirmDuplicateCac);
+    const duplicate = await checkDuplicateCac(
+      tx,
+      v.cacNo,
+      linked?.id ?? null,
+      null,
+      !!opts.confirmDuplicateCac,
+    );
 
     const pricing = await priceNewSubmission(tx, {
+      filingType: v.filingType,
       ...names,
       installedCapacityMw: v.installedCapacityMw,
       categoryOverride: v.categoryOverride,
@@ -180,8 +354,17 @@ export async function createSubmission(
     const ackNo = formatAckNo(ctx.settings.ackPrefix, v.dateSubmitted, seq);
 
     const submission = await tx.submission.create({
-      data: { ...submissionData(v), ackSeq: seq, ackNo, createdById: actor.id, ...pricing },
+      data: {
+        ...submissionData(v),
+        filingType: v.filingType,
+        linkedSubmissionId: linked?.id ?? null,
+        ackSeq: seq,
+        ackNo,
+        createdById: actor.id,
+        ...pricing,
+      },
     });
+    await writeChildren(tx, submission.id, childRows(v));
     await tx.evaluation.create({
       data: {
         submissionId: submission.id,
@@ -192,6 +375,8 @@ export async function createSubmission(
     });
 
     const extras = [
+      isLinkedFiling(v.filingType) &&
+        `${FILING_LABELS[v.filingType]} of ${linked!.registrationNo} (${linked!.ackNo})`,
       duplicate && "duplicate CAC confirmed",
       v.evaluatingOfficerId && "evaluating officer assigned",
     ];
@@ -200,57 +385,87 @@ export async function createSubmission(
       action: "New submission",
       reference: ackNo,
       detail: [
-        `${v.registeredName} - Category ${pricing.pricedCategory}`,
+        `${v.registeredName} - Category ${pricing.pricedCategory} - Form ${v.formFiled}`,
         ...extras.filter(Boolean),
       ].join("; "),
     });
-    await notify(tx, actor.id, {
-      kind: "submissionCreated",
-      sub: subjectOf({
-        row: submission,
-        evaluation: {
-          evaluatingOfficerId: v.evaluatingOfficerId,
-          reviewingSupervisorId: null,
-          approvingOfficerId: null,
-        },
-      }),
-    });
+    if (isLinkedFiling(v.filingType)) {
+      await writeAudit(tx, {
+        userId: actor.id,
+        action: `${FILING_LABELS[v.filingType]} filed`,
+        reference: linked!.ackNo,
+        detail: `${ackNo}, received ${formatDate(v.dateSubmitted)}`,
+      });
+    }
+    // Nothing to pay (an update or annual confirmation without a fee): released straight away, and
+    // the release notifies the evaluator; otherwise Finance is told a payment is awaited.
+    const released = await releaseIfCleared(
+      tx,
+      actor.id,
+      submission.id,
+      ctx.today,
+      "nothing to pay",
+    );
+    if (!released) {
+      await notify(tx, actor.id, {
+        kind: "submissionCreated",
+        sub: subjectOf({
+          row: submission,
+          evaluation: {
+            evaluatingOfficerId: v.evaluatingOfficerId,
+            reviewingSupervisorId: null,
+            approvingOfficerId: null,
+          },
+        }),
+      });
+    }
     return submission;
   });
 }
 
 // --- Editing -----------------------------------------------------------------
 
-type Shown = string | null;
-const show = (v: unknown): Shown => {
-  if (v === null || v === undefined || v === "") return null;
-  if (v instanceof Date) return formatDate(toIsoDate(v));
-  if (typeof v === "boolean") return v ? "Y" : "N";
-  if (typeof v === "object" && "toNumber" in (v as object))
-    return String((v as { toNumber(): number }).toNumber());
-  return String(v);
-};
-
 const FIELD_LABELS: Record<keyof ReturnType<typeof submissionData>, string> = {
+  formFiled: "form filed",
   registeredName: "registered name",
+  tradingName: "trading name",
   dateSubmitted: "date submitted",
   submissionChannel: "channel",
   registrantType: "registrant type",
   cacNo: "CAC no.",
+  incorporationDate: "date of incorporation",
   tin: "TIN",
   address: "address",
+  operationalAddress: "operational address",
+  website: "website",
   principalLga: "principal LGA",
-  otherAreasServed: "other areas",
+  lgasServed: "LGAs served",
+  otherAreasServed: "towns / estates served",
   primaryActivityCode: "primary activity",
-  secondaryActivityCode: "secondary activity",
   installedCapacityMw: "capacity (MW)",
   customers: "customers",
   licenceStatus: "licence status",
-  licenceNo: "licence no.",
-  licenceExpiry: "licence expiry",
+  mdName: "managing director",
+  mdPhone: "MD phone",
+  mdEmail: "MD email",
   complianceOfficer: "compliance officer",
   phone: "phone",
   email: "email",
+  signatory1Name: "signatory 1",
+  signatory1Designation: "signatory 1 designation",
+  signatory1Date: "signatory 1 date",
+  signatory2Name: "signatory 2",
+  signatory2Designation: "signatory 2 designation",
+  signatory2Date: "signatory 2 date",
+  holdsAnyLicence: "holds any licence",
+  multiStateLicensee: "multi-State licensee",
+  generationForSale: "generation for sale",
+  gridConnected: "grid connected",
+  interconnectedMinigrid: "interconnected mini-grid",
+  fDistribution: "Part 1 distribution",
+  fTrading: "Part 2 trading",
+  gDiscoBulkSupply: "DisCo bulk supply",
+  subFranchise: "sub-franchisee",
   operatingOnEffectiveDate: "operating on Effective Date",
   plannedStartDate: "planned start",
   categoryOverride: "category override",
@@ -258,8 +473,17 @@ const FIELD_LABELS: Record<keyof ReturnType<typeof submissionData>, string> = {
   remarks: "remarks",
 };
 
-async function findSubmission(tx: Tx, id: string): Promise<Submission> {
-  const row = await tx.submission.findUnique({ where: { id } });
+const CHILD_LABELS: Record<keyof ReturnType<typeof childrenText>, string> = {
+  otherActivities: "other activities",
+  licences: "licences",
+  shareholders: "shareholders",
+  directors: "directors",
+  confidentialityClaims: "confidentiality claims",
+  hseIncidents: "HSE incidents",
+};
+
+async function findSubmission(tx: Tx, id: string) {
+  const row = await tx.submission.findUnique({ where: { id }, include: childrenInclude });
   if (!row) throw new NotFoundError("Submission not found.");
   return row;
 }
@@ -270,16 +494,17 @@ const CERTIFICATE_FIELDS = new Set<string>([
   "cacNo",
   "address",
   "primaryActivityCode",
-  "secondaryActivityCode",
+  "otherActivities",
   "principalLga",
+  "lgasServed",
   "otherAreasServed",
   "licenceStatus",
-  "licenceNo",
+  "licences",
 ]);
 
 /**
  * Who may change a submission (docs/DECISIONS.md): while open, the role's `permission`; once closed
- * (Registered, Refused, Lapsed, Cancelled), only Admin, with a written reason.
+ * (Registered, Refused, Lapsed, Cancelled, Changes Applied), only Admin, with a written reason.
  */
 function authorizeEdit(
   actor: Actor,
@@ -309,7 +534,8 @@ const withReason = (detail: string, reason: string | null) =>
 
 /**
  * Edit intake fields. Pricing is not re-taken: if a change affects it, the record shows
- * "pricing out of date" until an admin recalculates (docs/DECISIONS.md).
+ * "pricing out of date" until an admin recalculates (docs/DECISIONS.md). The filing type and the
+ * registration an update links to never change.
  */
 export async function updateSubmission(
   db: Db,
@@ -328,26 +554,51 @@ export async function updateSubmission(
   return db.$transaction(async (tx) => {
     const current = await findSubmission(tx, id);
     const { status, reason } = authorizeEdit(actor, current, "submission.edit", opts.changeReason);
-    await checkAgainstReferenceData(tx, v);
+    if (v.filingType !== current.filingType) {
+      throw new ValidationError("Please correct the highlighted fields.", {
+        filingType: ["The filing type cannot change once saved; file a new submission instead"],
+      });
+    }
+    // The link is fixed (DB trigger); the form only shows it, so it is not looked up again.
+    await checkAgainstReferenceData(tx, { ...v, linkedRegistrationNo: null });
     const duplicate =
       v.cacNo !== current.cacNo &&
-      (await checkDuplicateCac(tx, v.cacNo, id, !!opts.confirmDuplicateCac));
+      (await checkDuplicateCac(
+        tx,
+        v.cacNo,
+        current.linkedSubmissionId ?? current.id,
+        id,
+        !!opts.confirmDuplicateCac,
+      ));
 
     const next = submissionData(v);
     const changed = (Object.keys(next) as (keyof typeof next)[]).filter(
-      (k) => show(current[k]) !== show(next[k]),
+      (k) => columnText(current[k]) !== columnText(next[k]),
     );
     const changes = changed.map(
-      (k) => `${FIELD_LABELS[k]}: ${show(current[k]) ?? "(blank)"} → ${show(next[k]) ?? "(blank)"}`,
+      (k) =>
+        `${FIELD_LABELS[k]}: ${columnText(current[k]) ?? "(blank)"} → ${columnText(next[k]) ?? "(blank)"}`,
     );
+    const children = childRows(v);
+    const before = childrenText(current);
+    const after = childrenText(children);
+    const changedChildren = (Object.keys(after) as (keyof typeof after)[]).filter(
+      (k) => before[k] !== after[k],
+    );
+    for (const k of changedChildren) {
+      changes.push(`${CHILD_LABELS[k]}: ${before[k] ?? "(none)"} → ${after[k] ?? "(none)"}`);
+    }
     if (!changes.length) return current;
 
     // A Registered record's certificate shows these fields; changing one means the certificate must be reissued.
-    const reissue = status === STATUS.REGISTERED && changed.some((k) => CERTIFICATE_FIELDS.has(k));
+    const reissue =
+      status === STATUS.REGISTERED &&
+      [...changed, ...changedChildren].some((k) => CERTIFICATE_FIELDS.has(k));
     const updated = await tx.submission.update({
       where: { id },
       data: { ...next, ...(reissue ? { certificateNeedsReissue: true } : {}) },
     });
+    if (changedChildren.length) await writeChildren(tx, id, children);
     const notes = [
       ...(duplicate ? ["duplicate CAC confirmed"] : []),
       ...(reissue ? ["certificate needs reissue"] : []),
@@ -362,9 +613,11 @@ export async function updateSubmission(
   });
 }
 
-const CHECK_TO_DB = { Y: "Y", N: "N", "N/A": "NA" } as const;
-
-/** Schedule 2 checklist (SPEC §1.2). `input` maps item number → "Y" | "N" | "N/A" | "" (blank). */
+/**
+ * Document checklist (SPEC §1.2) for the submission's form. `input` maps document key → "Y" | "N" |
+ * "N/A" | "" (blank). Items that are automatic (evidence of payment) or N/A by their condition
+ * cannot be set; keys not on the submission's list are refused.
+ */
 export async function updateDocuments(
   db: Db,
   actor: Actor,
@@ -378,28 +631,38 @@ export async function updateDocuments(
   return db.$transaction(async (tx) => {
     const current = await findSubmission(tx, id);
     const { reason } = authorizeEdit(actor, current, "documents.edit", opts.changeReason);
-    const docs = await tx.schedule2Document.findMany({ orderBy: { number: "asc" } });
-    const existing = await tx.documentChecklistItem.findMany({ where: { submissionId: id } });
-    const before = new Map(
-      existing.map((d) => [d.documentNumber, d.value === "NA" ? "N/A" : d.value]),
-    );
+    const ctx = await loadContext(tx);
+    const loaded = await loadSubmission(tx, id);
+    const a = assessSubmission(loaded!.sub, loaded!.payments, ctx);
+    const items = new Map(a.documents.items.map((d) => [d.key, d]));
 
     const changes: string[] = [];
-    for (const doc of docs) {
-      const value = parsed.data[String(doc.number)];
-      if (value === undefined) continue;
-      const old = before.get(doc.number) ?? "";
+    const locked: string[] = [];
+    for (const [key, value] of Object.entries(parsed.data)) {
+      const item = items.get(key);
+      if (!item) throw new ValidationError(`"${key}" is not on this submission's checklist.`);
+      const old = loaded!.sub.documents[key] ?? "";
+      if (item.mode !== "manual") {
+        if ((item.value ?? "") !== value) locked.push(item.text);
+        continue;
+      }
       if (old === value) continue;
-      changes.push(`${doc.name}: ${old || "blank"} → ${value || "blank"}`);
-      const key = { submissionId_documentNumber: { submissionId: id, documentNumber: doc.number } };
-      if (value === "") await tx.documentChecklistItem.delete({ where: key });
+      changes.push(`${item.text}: ${old || "blank"} → ${value || "blank"}`);
+      const where = { submissionId_documentKey: { submissionId: id, documentKey: key } };
+      if (value === "")
+        await tx.documentChecklistItem.deleteMany({ where: where.submissionId_documentKey });
       else {
         await tx.documentChecklistItem.upsert({
-          where: key,
-          create: { submissionId: id, documentNumber: doc.number, value: CHECK_TO_DB[value] },
+          where,
+          create: { submissionId: id, documentKey: key, value: CHECK_TO_DB[value] },
           update: { value: CHECK_TO_DB[value] },
         });
       }
+    }
+    if (locked.length) {
+      throw new ValidationError(
+        `These items are set automatically and cannot be changed: ${locked.join("; ")}.`,
+      );
     }
     if (changes.length) {
       await writeAudit(tx, {

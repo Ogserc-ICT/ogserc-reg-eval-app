@@ -44,9 +44,13 @@ const oun = (id: string, kw: number, lga = "Ifo"): OwnUseInput => ({
   name: `Factory ${id}`,
   dateFiled: ED,
   cacNo: null,
+  siteAddress: null,
   lga,
-  installedCapacityKw: kw,
+  units: [{ makeModel: null, capacityKw: kw, fuel: null, avgMonthlyMwh: null }],
+  documents: {},
   pricing: null,
+  registrationNo: null,
+  certificateIssueDate: null,
 });
 
 describe("dashboard months", () => {

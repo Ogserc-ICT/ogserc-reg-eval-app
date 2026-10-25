@@ -1,19 +1,39 @@
-import { activityCode, categoryAuto, categoryDescription } from "./category";
+import {
+  activityCode,
+  categoryAuto,
+  categoryDescription,
+  otherActivityCategories,
+} from "./category";
 import {
   daysLate,
   deficiencyResponseDue,
   determinationDue,
   licenceApplicationDue,
+  nearestLicenceExpiry,
   registrationDeadline,
 } from "./deadlines";
-import { isSubmissionComplete, summariseDocuments, type DocumentSummary } from "./documents";
+import {
+  documentList,
+  effectiveDocuments,
+  isSubmissionComplete,
+  paymentEvidenceValue,
+  summariseDocuments,
+  type DocumentSummary,
+} from "./documents";
+import { categoryOfForm, findForm, formForCategory, type RegistrationFormDef } from "./forms";
 import { feeSummary, type FeeSummary } from "./fees";
 import { financeGate, processStage, type FinanceGate, type ProcessStage } from "./finance";
 import { registrationNoInUse } from "./numbers";
 import { priceSubmission, pricingDifferences, type PricingSnapshot } from "./pricing";
 import type { ReferenceData, Settings } from "./reference";
 import { daysInQueue, slaLight, type SlaLight } from "./sla";
-import { isClosed, type IsoDate, type PaymentInput, type SubmissionInput } from "./types";
+import {
+  isClosed,
+  isLinkedFiling,
+  type IsoDate,
+  type PaymentInput,
+  type SubmissionInput,
+} from "./types";
 
 export interface DomainContext {
   ref: ReferenceData;
@@ -25,7 +45,14 @@ export interface DomainContext {
 /** Every calculated field of a Register row (SPEC §2). Derived on read; never edited. */
 export interface Assessment {
   primaryCode: string | null;
-  secondaryCode: string | null;
+  /** Codes of the other activities that are in the activities list. */
+  otherCodes: string[];
+  /** Category of the form filed (REG-01E → E). */
+  formCategory: string | null;
+  /** Form whose document list applies (see `documentsForm`). */
+  documentsForm: string | null;
+  /** Earliest expiry in the licences table. */
+  nearestLicenceExpiry: IsoDate | null;
   /** Category the current activity map gives (may differ from the snapshot). */
   categoryAuto: string | null;
   /** Category charged: from the pricing snapshot once saved. */
@@ -56,6 +83,23 @@ export interface Assessment {
   processStage: ProcessStage;
 }
 
+/**
+ * The form whose Schedule 2 list the submission must satisfy: the form filed, or, once the evaluator
+ * has confirmed another category and wrong forms are accepted (re-categorised), that category's form.
+ * Shared keys mean documents already received carry over to the new list.
+ */
+export function documentsForm(
+  sub: SubmissionInput,
+  ctx: DomainContext,
+): RegistrationFormDef | null {
+  const { forms } = ctx.ref;
+  if (sub.confirmedCategory && ctx.settings.policy.wrongFormHandling === "ACCEPT") {
+    const confirmed = formForCategory(sub.confirmedCategory, forms);
+    if (confirmed) return confirmed;
+  }
+  return findForm(sub.formFiled, forms) ?? formForCategory(sub.pricing?.category ?? null, forms);
+}
+
 export function assessSubmission(
   sub: SubmissionInput,
   payments: readonly PaymentInput[],
@@ -65,16 +109,30 @@ export function assessSubmission(
   const current = priceSubmission(sub, ref, settings);
   const pricing = sub.pricing ?? current;
   const effectiveDate = sub.pricing?.effectiveDate ?? settings.effectiveDate;
+  // Updates and annual confirmations have no registration deadline (no late charge).
   const deadline = sub.pricing
     ? sub.pricing.deadline
-    : registrationDeadline(sub.operatingOnEffectiveDate, sub.plannedStartDate, settings);
+    : isLinkedFiling(sub.filingType)
+      ? null
+      : registrationDeadline(sub.operatingOnEffectiveDate, sub.plannedStartDate, settings);
   const late = daysLate(sub.dateSubmitted, deadline);
   const fees = feeSummary(
     { terms: pricing, daysLate: late, approvedWaiver: sub.approvedWaiver, reference: sub.ackNo },
     payments,
     settings.policy,
   );
-  const documents = summariseDocuments(sub.documents, ref.schedule2Documents);
+  const form = documentsForm(sub, ctx);
+  const otherForms = otherActivityCategories(sub, ref, settings.policy)
+    .map((c) => formForCategory(c, ref.forms))
+    .filter((f): f is RegistrationFormDef => !!f && f.category !== "I");
+  const documents = summariseDocuments(
+    effectiveDocuments(
+      documentList(form, otherForms, settings.policy),
+      sub.documents,
+      sub.conditions,
+      paymentEvidenceValue(fees),
+    ),
+  );
   const detDue = determinationDue(sub.dateSubmissionComplete, settings);
   const defDue = deficiencyResponseDue(sub.deficiencyNoticeDate, settings);
   const queue = daysInQueue(sub.status, sub.dateSubmitted, today);
@@ -82,8 +140,13 @@ export function assessSubmission(
   const applied = pricing?.category ?? null;
   return {
     primaryCode: activityCode(sub.primaryActivity, ref),
-    secondaryCode: activityCode(sub.secondaryActivity, ref),
-    categoryAuto: categoryAuto(sub, ref),
+    otherCodes: sub.otherActivities
+      .map((n) => activityCode(n, ref))
+      .filter((c): c is string => !!c),
+    formCategory: categoryOfForm(sub.formFiled, ref.forms),
+    documentsForm: form?.form ?? null,
+    nearestLicenceExpiry: nearestLicenceExpiry(sub.licences),
+    categoryAuto: categoryAuto(sub, ref, settings.policy),
     categoryApplied: applied,
     categoryDescription: categoryDescription(applied, ref),
     pricing,

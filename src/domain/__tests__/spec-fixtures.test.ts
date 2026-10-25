@@ -48,7 +48,7 @@ describe("Mighty Power: MSL, 60 MW, Unlicensed, submitted on Effective Date", ()
     primaryActivity: activity("MSL"),
     installedCapacityMw: 60,
     licenceStatus: LICENCE.UNLICENSED,
-    licenceNo: null,
+    licences: [],
     dateSubmitted: ED,
   });
   const a = assessSubmission(sub, [], ctx());
@@ -116,7 +116,7 @@ describe("Highest applies: primary GEN 5 MW (D, ₦300k) + secondary EST (G, ₦
   it("is Category G", () => {
     const sub = makeSubmission({
       primaryActivity: activity("GEN"),
-      secondaryActivity: activity("EST"),
+      otherActivities: [activity("EST")],
       installedCapacityMw: 5,
     });
     expect(assessSubmission(sub, [], ctx()).categoryApplied).toBe("G");
@@ -127,7 +127,7 @@ describe("A dominates: secondary SDC", () => {
   it.each(["GEN", "EST", "MGD", "INT"])("primary %s + secondary SDC is Category A", (primary) => {
     const sub = makeSubmission({
       primaryActivity: activity(primary),
-      secondaryActivity: activity("SDC"),
+      otherActivities: [activity("SDC")],
       installedCapacityMw: 5,
     });
     expect(assessSubmission(sub, [], ctx()).categoryApplied).toBe("A");
@@ -175,7 +175,7 @@ describe("Waiver: fee 500k, waiver 100k, paid 400k, no late charge", () => {
 
   it("is Paid but not complete while a document is outstanding", () => {
     const docs = allDocs("Y");
-    docs[3] = "N";
+    docs.single_line_diagram = "N";
     const a = assessSubmission(makeSubmission({ ...base, documents: docs }), payments, ctx());
     expect(a.fees.paymentStatus).toBe("Paid");
     expect(a.submissionComplete).toBe(false);
@@ -283,7 +283,7 @@ describe("Approval blockers: each missing officer / pending check / failed check
 
   it("an incomplete submission is refused", () => {
     const docs = allDocs("Y");
-    docs[0] = "N";
+    docs.incorporation = "N";
     const sub = makeSubmission({ documents: docs, dateSubmissionComplete: ED });
     expect(approvalBlockers(evaluate({ sub }).approval)).toContain(
       "Submission is not complete (documents or fees outstanding)",

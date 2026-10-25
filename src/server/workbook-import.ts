@@ -7,6 +7,7 @@ import type {
 import ExcelJS from "exceljs";
 import { addDays } from "@/domain/dates";
 import { formatNaira } from "@/domain/money";
+import { totalCapacityKw } from "@/domain/own-use";
 import { deficiencyNoticeRef } from "@/domain/numbers";
 import { can } from "@/domain/roles";
 import { STATUS, type CheckValue, type Status } from "@/domain/types";
@@ -26,7 +27,7 @@ import { loadContext } from "./context";
 import { BlockedError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { DECISION_FROM_DB } from "./evaluation-state";
 import { fromIsoDate, koboToNumber, loadList } from "./reference-data";
-import { STATUS_FROM_DB, pricingToColumns } from "./submissions";
+import { STATUS_FROM_DB, conditionsToColumns, pricingToColumns } from "./submissions";
 import type { Actor, Db, Tx } from "./types";
 
 // Phase 7: import existing rows from the Excel workbook. Upload (stored with its hash) → preview (the
@@ -265,6 +266,8 @@ async function writePlan(
       data: {
         ackNo: s.ackNo,
         ackSeq: s.ackSeq,
+        filingType: "NEW",
+        formFiled: d.formFiled,
         registeredName: d.registeredName,
         dateSubmitted: fromIsoDate(d.dateSubmitted),
         submissionChannel: d.submissionChannel,
@@ -275,12 +278,10 @@ async function writePlan(
         principalLga: d.principalLga,
         otherAreasServed: d.otherAreasServed,
         primaryActivityCode: d.primaryActivityCode,
-        secondaryActivityCode: d.secondaryActivityCode,
         installedCapacityMw: d.installedCapacityMw,
         customers: d.customers,
         licenceStatus: d.licenceStatus,
-        licenceNo: d.licenceNo,
-        licenceExpiry: fromIsoDate(d.licenceExpiry),
+        ...conditionsToColumns(d.conditions),
         complianceOfficer: d.complianceOfficer,
         phone: d.phone,
         email: d.email,
@@ -299,9 +300,31 @@ async function writePlan(
         ...pricingToColumns(s.pricing),
         documents: {
           createMany: {
-            data: s.documents.flatMap((v, i) =>
-              v ? [{ documentNumber: i + 1, value: CHECK_TO_DB[v] }] : [],
-            ),
+            data: Object.entries(s.documents).map(([documentKey, v]) => ({
+              documentKey,
+              value: CHECK_TO_DB[v],
+            })),
+          },
+        },
+        otherActivities: {
+          createMany: {
+            data: d.otherActivityCodes.map((activityCode, i) => ({
+              activityCode,
+              sortOrder: i + 1,
+            })),
+          },
+        },
+        licences: {
+          createMany: {
+            data: d.licences.map((l, i) => ({
+              sortOrder: i + 1,
+              type: l.type,
+              issuingAuthority: l.issuingAuthority,
+              number: l.number,
+              issueDate: fromIsoDate(l.issueDate),
+              expiryDate: fromIsoDate(l.expiryDate),
+              activityCovered: l.activityCovered,
+            })),
           },
         },
       },
@@ -375,6 +398,17 @@ async function writePlan(
         pricedFee: BigInt(o.pricing.fee),
         pricedThresholdKw: o.pricing.thresholdKw,
         createdById: actor.id,
+        units: {
+          createMany: {
+            data: o.units.map((u, i) => ({
+              sortOrder: i + 1,
+              makeModel: u.makeModel,
+              capacityKw: String(u.capacityKw),
+              fuel: u.fuel,
+              avgMonthlyMwh: u.avgMonthlyMwh === null ? null : String(u.avgMonthlyMwh),
+            })),
+          },
+        },
       },
       select: { id: true },
     });
@@ -383,7 +417,7 @@ async function writePlan(
       userId: actor.id,
       action: "Imported from workbook",
       reference: o.ounNo,
-      detail: `${o.data.name} - ${o.data.installedCapacityKw} kW - fee ${formatNaira(o.pricing.fee)} (Own-use row ${o.row}; ${tag})`,
+      detail: `${o.data.name} - ${totalCapacityKw(o.units)} kW - fee ${formatNaira(o.pricing.fee)} (Own-use row ${o.row}; ${tag})`,
     });
   }
 

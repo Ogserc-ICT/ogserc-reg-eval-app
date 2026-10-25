@@ -8,10 +8,8 @@ export const OWN_USE_FIELDS = [
   "natureOfBusiness",
   "gridConnected",
   "distributionLicensee",
+  /** Generator units, as a JSON table. */
   "units",
-  "installedCapacityKw",
-  "fuel",
-  "avgMonthlyOutputMwh",
   "contactPerson",
   "phone",
   "email",

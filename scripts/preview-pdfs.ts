@@ -5,7 +5,11 @@ import { acknowledgementPdf } from "../src/server/pdf/acknowledgement";
 import { certificatePdf } from "../src/server/pdf/certificate";
 import { deficiencyPdf } from "../src/server/pdf/deficiency";
 import { evaluationFormPdf } from "../src/server/pdf/evaluation-form";
+import forms from "../registration-forms.json";
 import seed from "../seed-data.json";
+
+/** The REG-01E (mini-grid) checklist texts, for sample letters. */
+const e = forms.forms.find((f) => f.form === "REG-01E")!.documents.map((d) => d.text);
 import { pdfPageCount, renderPage } from "../tests/support/pdf";
 
 const naira = (n: number) => n * 100;
@@ -55,8 +59,10 @@ async function main() {
       address: "1 Example Road, Abeokuta",
       complianceOfficer: "Jane Doe",
       submissionChannel: "By hand",
+      formFiled: "REG-01E",
+      filing: { label: "New registration", linked: false, linkedRegistrationNo: null },
       primaryActivity: "Mini-grid / interconnected mini-grid",
-      secondaryActivity: null,
+      otherActivities: [],
       installedCapacityMw: 2.5,
       categoryApplied: "E",
       categoryDescription: "Mini-grids and interconnected mini-grids",
@@ -65,8 +71,8 @@ async function main() {
       balance: naira(150_000),
       daysLate: 0,
       lateCharge: 0,
-      receivedList: seed.schedule2_documents.slice(0, 9),
-      outstandingList: seed.schedule2_documents.slice(9),
+      receivedList: e.slice(0, 9),
+      outstandingList: e.slice(9),
       unlicensed: true,
       licenceApplicationDue: "2027-01-20",
       determinationDays: 30,
@@ -87,7 +93,7 @@ async function main() {
       address: null,
       complianceOfficer: null,
       categoryApplied: "E",
-      outstandingList: seed.schedule2_documents.slice(3, 6),
+      outstandingList: e.slice(3, 6),
       failedChecks: [
         { id: "2.2", text: seed.evaluation_checks[10]!.text },
         { id: "4.5", text: seed.evaluation_checks.find((c) => c.id === "4.5")!.text },

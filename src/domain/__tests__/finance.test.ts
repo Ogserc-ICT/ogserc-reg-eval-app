@@ -64,9 +64,13 @@ describe("only payments confirmed by Finance count", () => {
       name: "Factory",
       dateFiled: ED,
       cacNo: null,
+      siteAddress: null,
       lga: "Ifo",
-      installedCapacityKw: 650,
+      units: [{ makeModel: null, capacityKw: 650, fuel: null, avgMonthlyMwh: null }],
+      documents: {},
       pricing: null,
+      registrationNo: null,
+      certificateIssueDate: null,
     };
     const flagCtx = (payments: PaymentInput[]) => ({
       otherNotifications: [],

@@ -29,7 +29,8 @@ The Ogun State Electricity Regulatory Commission acknowledges receipt of your su
 | | |
 |---|---|
 | Date received (para 10(3)) | {{dateSubmitted}} by {{submissionChannel}} |
-| Activities declared | {{primaryActivity}}{{#secondaryActivity}}; {{secondaryActivity}}{{/secondaryActivity}} |
+| Filing | {{filingType}}, on Form {{formFiled}} — or, for an update or annual confirmation: {{filingType}} of registration {{linkedRegistrationNo}}, on Form {{formFiled}} |
+| Activities declared | {{primaryActivity}}{{#otherActivities}}; {{otherActivity}}{{/otherActivities}} (every other activity ticked, separated by "; ") |
 | Installed capacity | {{installedCapacityMw, 2dp}} MW |
 | Schedule 3 category (provisional) | Category {{categoryApplied}} — {{categoryDescription}} (subject to evaluation) |
 | Registration fee for the category | {{fee}} |
@@ -44,12 +45,14 @@ Pending: {{outstandingList or "none"}} — please supply these, or state the rea
 
 > Note: the Excel prints "Pending: none — please supply these…", which reads oddly. When nothing is pending, print "Pending: none." only.
 
+> New (category forms): Received and Pending list the items of the submission's own form (REG-01A to K, `registration-forms.json`) by their text, leaving out items that are N/A. "Evidence of payment of the registration fee" is pending until Finance confirms the fee. The "Filing" row is new wording, to be confirmed by the Commission.
+
 **3. What happens next**
 
 1. Evaluation. The Commission will now evaluate your submission. It is complete when it includes the information and documents required by paragraph 12 and evidence of payment of the registration fee (paragraph 13(1)).
 2. Decision within 30 days. Within thirty (30) days of receiving a complete submission, the Commission will either issue a Registration Certificate bearing a unique OGSERC registration number (paragraph 13(1)(a)) or notify you in writing of any missing or deficient information (paragraph 13(1)(b)).
 3. Deficiency notice. If you receive one, you must supply the information within fourteen (14) days, or your submission will lapse and you will be treated as not registered (paragraph 13(2)).
-4. Provisional registration. If the Commission has not acted within thirty (30) days of receiving your complete submission, you are provisionally registered from the next day, and the acknowledgement number above serves as your registration number (paragraph 13(4)).
+4. Provisional registration. If the Commission has not acted within thirty (30) days of receiving your complete submission, you are provisionally registered from the next day, and the acknowledgement number above serves as your registration number (paragraph 13(4)). *(Left out for updates and annual confirmations, which are not provisionally registered; the items that follow are renumbered.)*
 5. Verification. Authorized officers may inspect your installations, meters and records on not less than forty-eight (48) hours' notice (paragraph 22).
 6. Refusal only on stated grounds, after written reasons and fourteen (14) days to respond (paragraphs 13(3) and 20).
 
@@ -88,6 +91,8 @@ The Commission acknowledges receipt of your submission dated {{dateSubmitted}} f
 
 Outstanding documents (Schedule 2):
 {{outstandingList or "None"}}
+
+> Category forms: the outstanding items are those of the submission's form (or, once the evaluator has re-categorised it and wrong forms are accepted, of the confirmed category's form), by their text on that form.
 
 {{#failedChecks}}Other deficiencies found in evaluation:
 {{failedCheckTexts}}{{/failedChecks}}
@@ -128,9 +133,9 @@ Background: `assets/cert-security-background.png`. Top right: "Certificate Seria
 |---|---|
 | Registration category (Schedule 3) | {{CATEGORY}} |
 | Primary activity | {{ACTIVITY}} |
-| Other activities | {{OTHER}} |
-| Principal LGA and service area | {{AREA}} |
-| Licence / permit held | {{LICENCE}} |
+| Other activities | {{OTHER}} (every other activity ticked, separated by "; ", or "None") |
+| Principal LGA and service area | {{AREA}} (the principal LGA, then the other LGAs served, then "; " and the towns, communities or estates) |
+| Licence / permit held | {{LICENCE}} (the status, then "No." and every licence number in the licences table, separated by ", ") |
 
 > Issued at Abeokuta this {{DAY}} day of {{MONTH}}, {{YEAR}}
 >
@@ -145,11 +150,28 @@ Background: `assets/cert-security-background.png`. Top right: "Certificate Seria
 
 Shrink long names and addresses to fit (the Excel's `FitText` reduces the font size for long strings, with a minimum size). Add a QR code linking to a verification URL (new, optional; see CLAUDE.md phase 7).
 
+### Own-use certificate (Form REG-01I; only while the setting "own-use gets a certificate" is on)
+
+The same CERT-01 layout and wording, with:
+
+| | |
+|---|---|
+| REG_NO | `OGSERC/REG/{{yyyy}}/I-CPT/{{serial}}` |
+| NAME / CAC | the notification's name and CAC number |
+| ADDRESS | the site address |
+| Registration category (Schedule 3) | I — Own-use generation notification under paragraph 3(4) (200 kW to below 1 MW) |
+| Primary activity | Own-use generation, {{total kW}} kW (para 3(4)) |
+| Other activities | None |
+| Principal LGA and service area | the site's LGA |
+| Licence / permit held | Not applicable (own-use notification) |
+
+The QR code links to `{{APP_URL}}/verify/own-use/{{id}}`. The wording of these rows is new and should be confirmed by the Commission before the setting is switched on.
+
 ---
 
 ## 4. Evaluation form EVAL-01 (internal)
 
-Header: Acknowledgement No., Registrant, "Category / activity" ({{cat}} — {{primaryActivity}}), Evaluating officer, Reviewing supervisor, Approving officer, Date evaluation started.
+Header: Acknowledgement No., Registrant, "Category / activity" ({{cat}} — {{primaryActivity}}; Form {{formFiled}}; category confirmed {{confirmedCategory}} when recorded), Evaluating officer, Reviewing supervisor, Approving officer, Date evaluation started.
 
 Then each stage heading with its checks: `{{id}} | {{text}} | {{value}}`.
 

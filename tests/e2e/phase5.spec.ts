@@ -28,6 +28,7 @@ test.describe.serial("Phase 5: documents", () => {
   }) => {
     await signIn(page, REG.email, REG.password);
     await page.goto("/submissions/new");
+    await page.getByLabel(/^Form filed/).selectOption("REG-01G");
     await page.getByLabel(/^Registered name/).fill("Ijebu Ode Solar Estate Ltd");
     await page.getByLabel(/^Principal LGA/).selectOption("Ijebu Ode");
     await page.getByLabel(/^Primary activity/).selectOption("EST");

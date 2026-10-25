@@ -25,7 +25,15 @@ import {
   reopenDecision,
   saveChecks,
 } from "@/server/workflow";
-import { asWorkflow, confirmPayments, makeUser, resetDb, testDb } from "./helpers";
+import {
+  asWorkflow,
+  confirmFormCategory,
+  confirmPayments,
+  formDocuments,
+  makeUser,
+  resetDb,
+  testDb,
+} from "./helpers";
 
 const db = testDb();
 afterAll(() => db.$disconnect());
@@ -68,12 +76,12 @@ async function newSubmission(overrides: Record<string, string> = {}) {
     principalLga: "Ifo",
     otherAreasServed: "",
     primaryActivityCode: "MGD",
-    secondaryActivityCode: "",
+    filingType: "NEW",
+    formFiled: "REG-01E",
     installedCapacityMw: "2.5",
     customers: "",
     licenceStatus: "NERC registration/permit (mini-grid/captive)",
-    licenceNo: "NERC/MG/1",
-    licenceExpiry: "",
+    licences: [{ number: "NERC/MG/1" }],
     complianceOfficer: "",
     phone: "",
     email: "",
@@ -94,13 +102,7 @@ const assignAll = (id: string, o: Partial<Record<"e" | "s" | "a", string>> = {})
     approvingOfficerId: o.a ?? approver.id,
   });
 
-const completeDocs = (id: string) =>
-  updateDocuments(
-    db,
-    registry,
-    id,
-    Object.fromEntries(Array.from({ length: 13 }, (_, i) => [String(i + 1), "Y"])),
-  );
+const completeDocs = (id: string) => updateDocuments(db, registry, id, formDocuments());
 
 /** Record the ₦250,000 fee and have Finance confirm it (§4.12), which releases the submission. */
 async function payAndConfirm(ackNo: string) {
@@ -133,6 +135,8 @@ async function answerChecks(
   overrides: Record<string, string> = {},
   by: Actor = evaluator,
 ) {
+  // Check 1.10: the evaluator confirms the category of the form filed.
+  await confirmFormCategory(db, by, id, TODAY);
   const state = (await loadEvaluationState(db, id, await loadContext(db, TODAY)))!;
   const values = Object.fromEntries(
     state.checks.filter((c) => c.mode === "manual" && !c.postApproval).map((c) => [c.id, "Y"]),
@@ -222,9 +226,12 @@ describe("markSubmissionComplete (§4.4)", () => {
       (e) => e,
     );
     expect(err).toBeInstanceOf(BlockedError);
-    // The fee is confirmed (it had to be, to get here); the documents are not.
+    // The fee is confirmed (it had to be, to get here), so evidence of payment ticked itself; the
+    // other 12 REG-01E documents are outstanding.
     expect(err.reasons.filter((r: string) => r.startsWith("Unpaid"))).toEqual([]);
-    expect(err.reasons.filter((r: string) => r.startsWith("Outstanding:"))).toHaveLength(13);
+    const outstanding = err.reasons.filter((r: string) => r.startsWith("Outstanding:"));
+    expect(outstanding).toHaveLength(12);
+    expect(outstanding).not.toContain("Outstanding: Evidence of payment of the registration fee");
     expect(
       (await db.submission.findUniqueOrThrow({ where: { id: sub.id } })).dateSubmissionComplete,
     ).toBeNull();
@@ -253,7 +260,7 @@ describe("issueDeficiency (§4.5)", () => {
       status: "DEFICIENCY",
     });
     expect((await lastAudit()).detail).toMatch(
-      /^OGSERC\/DEF\/2026\/00001; response due 5 November 2026; 13 document\(s\) outstanding/,
+      /^OGSERC\/DEF\/2026\/00001; response due 5 November 2026; 12 document\(s\) outstanding/,
     );
     await expect(issueDeficiency(db, supervisor, sub.id, { today: TODAY })).rejects.toBeInstanceOf(
       BlockedError,
@@ -364,12 +371,12 @@ describe("approveAndRegister (§4.6)", () => {
       principalLga: "Ifo",
       otherAreasServed: "",
       primaryActivityCode: "MGD",
-      secondaryActivityCode: "",
+      filingType: "NEW",
+      formFiled: "REG-01E",
       installedCapacityMw: "2",
       customers: "",
       licenceStatus: "NERC registration/permit (mini-grid/captive)",
-      licenceNo: "N/1",
-      licenceExpiry: "",
+      licences: [{ number: "N/1" }],
       complianceOfficer: "",
       phone: "",
       email: "",
@@ -389,7 +396,7 @@ describe("approveAndRegister (§4.6)", () => {
   it("requires a written override for data flags, and records it", async () => {
     const sub = await readyForApproval();
     // A flag: licence held but no licence number.
-    await db.submission.update({ where: { id: sub.id }, data: { licenceNo: null } });
+    await db.submissionLicence.deleteMany({ where: { submissionId: sub.id } });
     const err = await approveAndRegister(
       db,
       approver,
@@ -684,12 +691,12 @@ describe("Registered records: certificate fields", () => {
       principalLga: "Ifo",
       otherAreasServed: "",
       primaryActivityCode: "MGD",
-      secondaryActivityCode: "",
+      filingType: "NEW",
+      formFiled: "REG-01E",
       installedCapacityMw: "2.5",
       customers: "",
       licenceStatus: "NERC registration/permit (mini-grid/captive)",
-      licenceNo: "NERC/MG/1",
-      licenceExpiry: "",
+      licences: [{ number: "NERC/MG/1" }],
       complianceOfficer: "",
       phone: "",
       email: "",

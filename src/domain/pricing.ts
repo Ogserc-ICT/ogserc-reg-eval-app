@@ -3,7 +3,7 @@ import { registrationDeadline } from "./deadlines";
 import { formatDate } from "./dates";
 import { formatNaira } from "./money";
 import { findFeeRow, type ReferenceData, type Settings } from "./reference";
-import type { IsoDate, Kobo, SubmissionInput } from "./types";
+import { isLinkedFiling, type IsoDate, type Kobo, type SubmissionInput } from "./types";
 
 /** The Schedule 3 amounts a submission is charged under. */
 export interface FeeTerms {
@@ -45,25 +45,43 @@ export function feeTermsFor(category: string | null, ref: ReferenceData): FeeTer
 
 export type PricingInput = Pick<
   SubmissionInput,
+  | "filingType"
   | "primaryActivity"
-  | "secondaryActivity"
+  | "otherActivities"
   | "installedCapacityMw"
   | "categoryOverride"
   | "operatingOnEffectiveDate"
   | "plannedStartDate"
 >;
 
-/** Price a submission under the current fee table and Settings. Null if no category can be determined. */
+/**
+ * Price a submission under the current fee table and Settings. Null if no category can be determined.
+ * Updates and annual confirmations have no registration deadline, so no late charge, and pay no fee
+ * unless the "fee on updates" setting is on.
+ */
 export function priceSubmission(
   input: PricingInput,
   ref: ReferenceData,
   settings: Settings,
 ): PricingSnapshot | null {
-  const category = categoryApplied(input.categoryOverride, categoryAuto(input, ref));
+  const category = categoryApplied(
+    input.categoryOverride,
+    categoryAuto(input, ref, settings.policy),
+  );
   if (!category || !findFeeRow(category, ref)) return null;
+  const terms = feeTermsFor(category, ref);
+  if (isLinkedFiling(input.filingType)) {
+    return {
+      category,
+      ...NO_FEE_TERMS,
+      registrationFee: settings.policy.filingFeeOnUpdates ? terms.registrationFee : 0,
+      deadline: null,
+      effectiveDate: settings.effectiveDate,
+    };
+  }
   return {
     category,
-    ...feeTermsFor(category, ref),
+    ...terms,
     deadline: registrationDeadline(
       input.operatingOnEffectiveDate,
       input.plannedStartDate,

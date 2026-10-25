@@ -13,7 +13,7 @@ export default async function NewOwnUsePage() {
   return (
     <div>
       <PageHeader
-        title="New own-use notification (OUN-01)"
+        title="New own-use notification (Form REG-01I)"
         back={{ href: "/own-use", label: "Own-use notifications" }}
       />
       <OwnUseForm

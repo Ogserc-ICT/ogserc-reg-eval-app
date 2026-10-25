@@ -20,3 +20,6 @@ export * from "./roles";
 export * from "./pricing";
 export * from "./certificate";
 export * from "./dashboard";
+export * from "./forms";
+export * from "./legacy-documents";
+export * from "./filing";

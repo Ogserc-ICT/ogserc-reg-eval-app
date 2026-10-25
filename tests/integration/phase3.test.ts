@@ -40,12 +40,12 @@ const intake = (o: Record<string, string> = {}) => ({
   principalLga: "Abeokuta South",
   otherAreasServed: "",
   primaryActivityCode: "MGD",
-  secondaryActivityCode: "",
+  filingType: "NEW",
+  formFiled: "REG-01E",
   installedCapacityMw: "2.5",
   customers: "1,200",
   licenceStatus: "NERC registration/permit (mini-grid/captive)",
-  licenceNo: "NERC/MG/001",
-  licenceExpiry: "",
+  licences: [{ number: "NERC/MG/001" }],
   complianceOfficer: "Jane Doe",
   phone: "0801 234 5678",
   email: "compliance@example.ng",
@@ -79,7 +79,7 @@ describe("createSubmission (§4.1)", () => {
     expect(await lastAudit()).toMatchObject({
       action: "New submission",
       reference: sub.ackNo,
-      detail: "Ogun Mini-Grid Ltd - Category E",
+      detail: "Ogun Mini-Grid Ltd - Category E - Form REG-01E",
     });
     const second = await createSubmission(
       db,
@@ -221,10 +221,16 @@ describe("updateSubmission", () => {
     expect((await lastAudit()).detail).toBe(
       "remarks: (blank) → late note. Reason: Applicant letter of 1 Nov",
     );
-    await expect(updateDocuments(db, registry, sub.id, { "1": "Y" })).rejects.toBeInstanceOf(
-      ForbiddenError,
+    await expect(
+      updateDocuments(db, registry, sub.id, { incorporation: "Y" }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    await updateDocuments(
+      db,
+      admin,
+      sub.id,
+      { incorporation: "Y" },
+      { changeReason: "Found in post room" },
     );
-    await updateDocuments(db, admin, sub.id, { "1": "Y" }, { changeReason: "Found in post room" });
     expect((await lastAudit()).detail).toContain("Reason: Found in post room");
   });
 
@@ -245,19 +251,28 @@ describe("updateSubmission", () => {
 describe("documents checklist", () => {
   it("saves Y / N / N/A / blank and audits each change", async () => {
     const sub = await createSubmission(db, registry, intake());
-    await updateDocuments(db, registry, sub.id, { "1": "Y", "2": "N", "13": "N/A" });
-    await updateDocuments(db, registry, sub.id, { "1": "Y", "2": "", "3": "Y" });
+    // REG-01E's list, by shared document key.
+    await updateDocuments(db, registry, sub.id, {
+      incorporation: "Y",
+      constitution: "N",
+      community_consent: "N/A",
+    });
+    await updateDocuments(db, registry, sub.id, {
+      incorporation: "Y",
+      constitution: "",
+      licences: "Y",
+    });
     const items = await db.documentChecklistItem.findMany({
       where: { submissionId: sub.id },
-      orderBy: { documentNumber: "asc" },
+      orderBy: { documentKey: "asc" },
     });
-    expect(items.map((i) => [i.documentNumber, i.value])).toEqual([
-      [1, "Y"],
-      [3, "Y"],
-      [13, "NA"],
+    expect(items.map((i) => [i.documentKey, i.value])).toEqual([
+      ["community_consent", "NA"],
+      ["incorporation", "Y"],
+      ["licences", "Y"],
     ]);
     expect((await lastAudit()).detail).toBe(
-      "2. Memorandum & articles (or equivalent): N → blank; 3. Copy of every licence / permit / registration: blank → Y",
+      "Constitutional documents (or equivalent): N → blank; Copy of every NERC or OGSERC permit or registration, by site: blank → Y",
     );
   });
 });
@@ -331,7 +346,17 @@ describe("payments (§4.2)", () => {
   });
 });
 
-describe("own-use notifications (§4.3)", () => {
+describe("own-use notifications (§4.3, Form REG-01I)", () => {
+  /** Generator units as the form posts them: a JSON table. */
+  const units = (...kw: number[]) =>
+    JSON.stringify(
+      kw.map((k, i) => ({
+        makeModel: `Gen ${i + 1}`,
+        capacityKw: String(k),
+        fuel: "Gas",
+        avgMonthlyMwh: "60",
+      })),
+    );
   const oun = (o: Record<string, string> = {}) => ({
     name: "Ifo Packaging Ltd",
     dateFiled: "2026-10-22",
@@ -341,10 +366,7 @@ describe("own-use notifications (§4.3)", () => {
     natureOfBusiness: "Packaging",
     gridConnected: "Y",
     distributionLicensee: "Ibadan DisCo",
-    units: "2",
-    installedCapacityKw: "650",
-    fuel: "Gas",
-    avgMonthlyOutputMwh: "120",
+    units: units(400, 250),
     contactPerson: "A. Bello",
     phone: "08012345678",
     email: "ops@ifo.ng",
@@ -359,8 +381,9 @@ describe("own-use notifications (§4.3)", () => {
       pricedThresholdKw: 200,
     });
     expect((await lastAudit()).detail).toBe(
-      "Ifo Packaging Ltd - 650 kW - Notification required - fee ₦100,000",
+      "Ifo Packaging Ltd - Form REG-01I - 650 kW (2 unit(s)) - Notification required - fee ₦100,000",
     );
+    expect(await db.ownUseUnit.count({ where: { ownUseNotificationId: row.id } })).toBe(2);
     const [listed] = await listOwnUse(db);
     expect(listed!.assessment).toMatchObject({ feeDue: naira(100_000), paymentStatus: "Unpaid" });
     expect(listed!.assessment.flags.map((f) => f.code)).toEqual(["FEE_UNPAID"]);
@@ -380,19 +403,37 @@ describe("own-use notifications (§4.3)", () => {
     expect(paid!.assessment.paymentStatus).toBe("Paid");
   });
 
-  it("150 kW needs confirmation; 1,200 kW is refused", async () => {
+  it("150 kW in total needs confirmation; 1,200 kW in total is refused", async () => {
     await expect(
-      createOwnUse(db, registry, oun({ installedCapacityKw: "150" })),
+      createOwnUse(db, registry, oun({ units: units(100, 50), siteAddress: "Site A" })),
     ).rejects.toBeInstanceOf(ConfirmationRequiredError);
-    const small = await createOwnUse(db, registry, oun({ installedCapacityKw: "150" }), {
-      confirmBelowThreshold: true,
-    });
+    const small = await createOwnUse(
+      db,
+      registry,
+      oun({ units: units(100, 50), siteAddress: "Site A" }),
+      { confirmBelowThreshold: true },
+    );
     expect(small.pricedFee).toBe(0n);
-    await expect(
-      createOwnUse(db, registry, oun({ installedCapacityKw: "1200" })),
-    ).rejects.toMatchObject({
-      fieldErrors: { installedCapacityKw: [expect.stringContaining("para 3(3)(c)")] },
+    await expect(createOwnUse(db, registry, oun({ units: units(700, 500) }))).rejects.toMatchObject(
+      {
+        fieldErrors: { units: [expect.stringContaining("para 3(3)(c)")] },
+      },
+    );
+    await expect(createOwnUse(db, registry, oun({ units: "[]" }))).rejects.toMatchObject({
+      fieldErrors: { units: ["Add at least one generator unit"] },
     });
+  });
+
+  it("warns on a second notification for the same CAC number and site, not another site", async () => {
+    await createOwnUse(db, registry, oun());
+    await expect(createOwnUse(db, registry, oun())).rejects.toMatchObject({
+      field: "confirmSameSite",
+    });
+    await createOwnUse(db, registry, oun({ siteAddress: "Plot 9 Sagamu Road" }));
+    await createOwnUse(db, registry, oun(), { confirmSameSite: true });
+    const flags = (await listOwnUse(db)).map((o) => o.assessment.flags.map((f) => f.code));
+    expect(flags.filter((f) => f.includes("DUPLICATE_SITE"))).toHaveLength(2);
+    expect(flags.flat()).not.toContain("DUPLICATE_CAC");
   });
 
   it("keeps its fee when the fee table changes, until an admin recalculates", async () => {
@@ -419,8 +460,10 @@ describe("own-use notifications (§4.3)", () => {
   it("edits are audited and flag a CAC already on the Register", async () => {
     await createSubmission(db, registry, intake({ cacNo: "RC777" }));
     const row = await createOwnUse(db, registry, oun());
-    await updateOwnUse(db, registry, row.id, oun({ units: "3" }));
-    expect((await lastAudit()).detail).toBe("units: 2 → 3");
+    await updateOwnUse(db, registry, row.id, oun({ units: units(400, 300) }));
+    expect((await lastAudit()).detail).toBe(
+      "generator units: Gen 1, 400 kW, Gas, 60 MWh/month; Gen 2, 250 kW, Gas, 60 MWh/month → Gen 1, 400 kW, Gas, 60 MWh/month; Gen 2, 300 kW, Gas, 60 MWh/month",
+    );
     const [listed] = await listOwnUse(db);
     expect(listed!.assessment.flags.map((f) => f.code)).toContain("CAC_ON_REGISTER");
   });
@@ -470,7 +513,12 @@ describe("Register list", () => {
     await createSubmission(
       db,
       registry,
-      intake({ cacNo: "RC2", registeredName: "Beta Grid", primaryActivityCode: "EST" }),
+      intake({
+        cacNo: "RC2",
+        registeredName: "Beta Grid",
+        primaryActivityCode: "EST",
+        formFiled: "REG-01G",
+      }),
     );
     await recordPayment(db, finance, {
       dateReceived: "2026-10-22",
@@ -491,6 +539,9 @@ describe("Register list", () => {
     expect(await names({ payment: "Paid" })).toEqual(["Alpha Power"]);
     expect(await names({ payment: "Unpaid" })).toEqual(["Beta Grid"]);
     expect(await names({ flagged: true })).toEqual([]);
+    expect(await names({ form: "REG-01G" })).toEqual(["Beta Grid"]);
+    expect(await names({ filing: "NEW" })).toEqual(["Beta Grid", "Alpha Power"]);
+    expect(await names({ filing: "UPDATE" })).toEqual([]);
   });
 });
 

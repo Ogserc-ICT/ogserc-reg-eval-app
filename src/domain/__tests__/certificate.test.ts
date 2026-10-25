@@ -5,10 +5,11 @@ import {
   countInWords,
   licenceText,
   numberInWords,
+  serviceAreaText,
 } from "../certificate";
 import { assessSubmission } from "../submission";
 import { LICENCE, STATUS } from "../types";
-import { activity, ctx, makeSubmission, readySettings, settings } from "./helpers";
+import { activity, ctx, licence, makeSubmission, readySettings, settings } from "./helpers";
 
 const registered = (o: Parameters<typeof makeSubmission>[0] = {}) =>
   makeSubmission({
@@ -17,7 +18,7 @@ const registered = (o: Parameters<typeof makeSubmission>[0] = {}) =>
     certificateIssueDate: "2026-10-22",
     primaryActivity: activity("MSL"),
     licenceStatus: LICENCE.MULTI_STATE,
-    licenceNo: "NERC/MS/7",
+    licences: [licence("NERC/MS/7")],
     ...o,
   });
 
@@ -27,7 +28,7 @@ describe("CERT-01 fields (SPEC §7)", () => {
       registeredName: "Mighty Power Ltd",
       cacNo: "RC123456",
       address: "1 Power Road, Sagamu",
-      secondaryActivity: activity("TRD"),
+      otherActivities: [activity("TRD")],
       principalLga: "Sagamu",
       otherAreasServed: "Remo North; Ikenne",
     });
@@ -56,18 +57,39 @@ describe("CERT-01 fields (SPEC §7)", () => {
     const sub = registered({
       cacNo: null,
       address: null,
-      secondaryActivity: null,
+      otherActivities: [],
       otherAreasServed: null,
     });
     const f = certificateFields(sub, assessSubmission(sub, [], ctx()), readySettings);
     expect(f).toMatchObject({ CAC: "N/A", ADDRESS: "—", OTHER: "None", AREA: "Abeokuta South" });
   });
 
-  it("words the licence line", () => {
-    expect(licenceText(LICENCE.UNLICENSED, null)).toBe("None — application pending");
-    expect(licenceText(null, null)).toBe("None — application pending");
-    expect(licenceText("OGSERC licence/permit", null)).toBe("OGSERC licence/permit");
-    expect(licenceText("OGSERC licence/permit", " L-9 ")).toBe("OGSERC licence/permit, No. L-9");
+  it("words the licence line, with every licence number in the table", () => {
+    expect(licenceText(LICENCE.UNLICENSED, [])).toBe("None — application pending");
+    expect(licenceText(null, [])).toBe("None — application pending");
+    expect(licenceText("OGSERC licence/permit", [])).toBe("OGSERC licence/permit");
+    expect(licenceText("OGSERC licence/permit", [licence(null)])).toBe("OGSERC licence/permit");
+    expect(licenceText("OGSERC licence/permit", [licence(" L-9 ")])).toBe(
+      "OGSERC licence/permit, No. L-9",
+    );
+    expect(licenceText("OGSERC licence/permit", [licence("L-9"), licence("NERC/2")])).toBe(
+      "OGSERC licence/permit, No. L-9, NERC/2",
+    );
+  });
+
+  it("lists every other activity, and the LGAs served after the principal LGA", () => {
+    const sub = registered({
+      otherActivities: [activity("TRD"), activity("MET")],
+      principalLga: "Sagamu",
+      lgasServed: ["Ikenne", "Sagamu", "Remo North"],
+      otherAreasServed: "Ogere estate",
+    });
+    const f = certificateFields(sub, assessSubmission(sub, [], ctx()), readySettings);
+    expect(f.OTHER).toBe("Trading / bulk supply; Metering services");
+    expect(f.AREA).toBe("Sagamu, Ikenne, Remo North; Ogere estate");
+    expect(serviceAreaText({ principalLga: "Ifo", lgasServed: [], otherAreasServed: null })).toBe(
+      "Ifo",
+    );
   });
 
   it("is blocked while a signatory is '[Name]' or the record is not registered", () => {

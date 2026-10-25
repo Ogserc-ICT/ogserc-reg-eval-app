@@ -1,3 +1,4 @@
+import type { Conditions } from "./forms";
 import type { PricingSnapshot } from "./pricing";
 
 /** Calendar date without time, "YYYY-MM-DD". Legal dates are stored and compared this way. */
@@ -21,6 +22,8 @@ export const STATUS = {
   LAPSED: "Lapsed",
   REFUSED: "Refused",
   CANCELLED: "Cancelled",
+  /** An update or annual confirmation approved and applied to its registered record (para 16). */
+  APPLIED: "Changes Applied",
 } as const;
 
 export type Status = (typeof STATUS)[keyof typeof STATUS];
@@ -32,6 +35,7 @@ export const CLOSED_STATUSES: readonly Status[] = [
   STATUS.REFUSED,
   STATUS.LAPSED,
   STATUS.CANCELLED,
+  STATUS.APPLIED,
 ];
 
 export function isClosed(status: Status | null): boolean {
@@ -51,7 +55,9 @@ export const FINAL_DECISION = {
   REFUSE: "Refuse (13(3)) - after show-cause",
   LAPSE: "Treat as lapsed (13(2))",
   PROVISIONAL: "Provisional registration (13(4))",
-  REDIRECT: "Redirect to OUN-01 / outside scope",
+  REDIRECT: "Redirect to REG-01I / outside scope",
+  /** Updates and annual confirmations: approved, and their changes applied to the registered record. */
+  APPLY: "Accept filing and apply changes (para 16)",
 } as const;
 
 export type FinalDecision = (typeof FINAL_DECISION)[keyof typeof FINAL_DECISION];
@@ -71,10 +77,45 @@ export interface PaymentInput {
 
 export type FinanceStatus = "PENDING" | "CONFIRMED" | "REJECTED";
 
+/** What a submission is (registration-forms.json `filing_types`). */
+export const FILING = {
+  NEW: "NEW",
+  /** Material change, para 16(1). */
+  UPDATE: "UPDATE",
+  /** Para 16(2): due by 31 January each year (Settings). */
+  ANNUAL: "ANNUAL",
+} as const;
+
+export type FilingType = (typeof FILING)[keyof typeof FILING];
+
+export const FILING_LABELS: Record<FilingType, string> = {
+  NEW: "New registration",
+  UPDATE: "Update: material change (para 16(1))",
+  ANNUAL: "Annual confirmation (para 16(2))",
+};
+
+/** Updates and annual confirmations link to an existing registered submission. */
+export const isLinkedFiling = (t: FilingType | null | undefined) => !!t && t !== FILING.NEW;
+
+/** A row of the licences table (Schedule 1 C). */
+export interface LicenceInput {
+  type: string | null;
+  issuingAuthority: string | null;
+  number: string | null;
+  issueDate: IsoDate | null;
+  expiryDate: IsoDate | null;
+  activityCovered: string | null;
+}
+
 /** A Register row (SPEC §1.1) plus its document checklist (§1.2). */
 export interface SubmissionInput {
   id: string;
   ackNo: string | null;
+  filingType: FilingType;
+  /** Form the applicant used, "REG-01A" … "REG-01K" (not REG-01I, which is own-use). */
+  formFiled: string | null;
+  /** Updates and annual confirmations: the registered submission they refer to. */
+  linkedSubmissionId: string | null;
   registeredName: string | null;
   dateSubmitted: IsoDate | null;
   submissionChannel: string | null;
@@ -83,14 +124,17 @@ export interface SubmissionInput {
   tin: string | null;
   address: string | null;
   principalLga: string | null;
+  /** Every LGA served (multi-select); the principal LGA counts as served whether ticked or not. */
+  lgasServed: string[];
+  /** Towns, communities, estates or industrial clusters served (free text). */
   otherAreasServed: string | null;
   primaryActivity: string | null;
-  secondaryActivity: string | null;
+  /** Every other activity ticked (names); "highest category applies" across all of them. */
+  otherActivities: string[];
   installedCapacityMw: number | null;
   customers: number | null;
   licenceStatus: string | null;
-  licenceNo: string | null;
-  licenceExpiry: IsoDate | null;
+  licences: LicenceInput[];
   complianceOfficer: string | null;
   phone: string | null;
   email: string | null;
@@ -99,6 +143,9 @@ export interface SubmissionInput {
   approvedWaiver: Kobo;
   categoryOverride: string | null;
   overrideReason: string | null;
+  /** Category the evaluator confirmed ("Category confirmed" action), with a reason if it differs from the form. */
+  confirmedCategory: string | null;
+  categoryConfirmedReason: string | null;
   status: Status | null;
   dateSubmissionComplete: IsoDate | null;
   deficiencyNoticeDate: IsoDate | null;
@@ -106,8 +153,10 @@ export interface SubmissionInput {
   /** Locked registration number; set only by the approval action. */
   registrationNo: string | null;
   remarks: string | null;
-  /** The 13 Schedule 2 items, in seed order. */
-  documents: CheckValue[];
+  /** Stored checklist values by shared document key (absent = blank). */
+  documents: Record<string, CheckValue>;
+  /** Yes/no answers that make conditional documents N/A (registration-forms.json `required_when`). */
+  conditions: Conditions;
   /** Pricing frozen when the submission was saved; null for one not yet saved (priced live). */
   pricing: PricingSnapshot | null;
   /** When confirmed payments first cleared the Finance gate (set by the release; locked). */
