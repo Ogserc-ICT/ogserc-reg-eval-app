@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseNairaToKobo } from "@/domain/money";
+import { groupNairaTyping } from "../format";
 import { safeInternalPath } from "../paths";
 
 describe("parseNairaToKobo", () => {
@@ -30,4 +31,22 @@ describe("safeInternalPath", () => {
     null,
     undefined,
   ])("falls back for %j", (path) => expect(safeInternalPath(path, "/payments")).toBe("/payments"));
+});
+
+describe("groupNairaTyping", () => {
+  it.each([
+    ["", ""],
+    ["250000", "250,000"],
+    ["1234567.5", "1,234,567.5"],
+    ["1,234.567", "1,234.56"],
+    ["₦12,3", "123"],
+    ["007", "7"],
+    [".5", "0.5"],
+    ["1.2.3", "1.23"],
+    ["abc", ""],
+  ])("%j → %j", (input, shown) => expect(groupNairaTyping(input)).toBe(shown));
+
+  it("gives back what parseNairaToKobo reads", () => {
+    expect(parseNairaToKobo(groupNairaTyping("1234567.89"))).toBe(123_456_789);
+  });
 });

@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { ConfirmBox } from "@/components/confirm-box";
 import { Field, FormMessage, SubmitButton, formKey, inputClass } from "@/components/form";
+import { NairaInput } from "@/components/naira-input";
 import type { FormOptions } from "@/server/options";
 import { recordPaymentAction } from "../actions";
 
@@ -57,15 +58,8 @@ export function PaymentForm({
             className={inputClass}
           />
         </Field>
-        <Field label="Amount (₦) *" name="amount" errors={e}>
-          <input
-            id="amount"
-            name="amount"
-            inputMode="decimal"
-            defaultValue={v.amount}
-            placeholder="250,000"
-            className={inputClass}
-          />
+        <Field label="Amount *" name="amount" errors={e}>
+          <NairaInput id="amount" name="amount" defaultValue={v.amount} placeholder="250,000" />
         </Field>
         <Field label="RRR / bank reference" name="rrr" errors={e}>
           <input id="rrr" name="rrr" defaultValue={v.rrr} className={inputClass} />

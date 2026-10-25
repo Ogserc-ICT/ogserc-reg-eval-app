@@ -28,3 +28,20 @@ export function documentStatusText(d: {
   if (d.value === "N/A") return "N/A";
   return "Pending";
 }
+
+/**
+ * A naira amount as it is typed: digits grouped with commas, at most two decimal places, anything
+ * else dropped. "250000" → "250,000"; "1234.5" → "1,234.5"; "₦12,3" → "123".
+ */
+export function groupNairaTyping(input: string): string {
+  const cleaned = input.replace(/[^\d.]/g, "");
+  const dot = cleaned.indexOf(".");
+  const whole = (dot === -1 ? cleaned : cleaned.slice(0, dot)).replace(/^0+(?=\d)/, "");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  if (dot === -1) return grouped;
+  const decimals = cleaned
+    .slice(dot + 1)
+    .replace(/\./g, "")
+    .slice(0, 2);
+  return `${grouped || "0"}.${decimals}`;
+}
