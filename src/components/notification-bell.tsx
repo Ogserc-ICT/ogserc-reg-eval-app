@@ -27,11 +27,11 @@ function isEditing(): boolean {
  * Keeps the page in step with other users. Every LIVE_POLL_SECONDS (only while the tab is visible) it
  * asks /api/live for the newest change; when there is one, the page's data is refreshed in place,
  * waiting until the user leaves the field they are typing in. Returns the unread notification count
- * and a function to check again at once.
+ * (null until the first answer) and a function to check again at once.
  */
-function useLiveUpdates(): [number, () => void] {
+function useLiveUpdates(): [number | null, () => void] {
   const router = useRouter();
-  const [unread, setUnread] = useState(0);
+  const [unread, setUnread] = useState<number | null>(null);
   const version = useRef<string | null>(null);
   const pending = useRef(false);
   const pollNow = useRef<() => void>(() => {});
@@ -87,6 +87,73 @@ function useLiveUpdates(): [number, () => void] {
   return [unread, useCallback(() => pollNow.current(), [])];
 }
 
+const SOUND_KEY = "ogserc.notificationSound";
+
+/** The user's sound preference (on unless they turned it off). Browser storage may be unavailable. */
+function soundEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(SOUND_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+let audio: AudioContext | null = null;
+
+/**
+ * Browsers only let a page play sound after the user has clicked or typed on it, so the audio context
+ * is created (or resumed) on the first such gesture and reused for every chime.
+ */
+function unlockAudio() {
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === "suspended") void audio.resume();
+  } catch {
+    // No Web Audio: the red badge still shows.
+  }
+}
+
+/** A short two-note alert, generated so no sound file is needed. */
+function playChime() {
+  if (!audio || audio.state !== "running" || !soundEnabled()) return;
+  const start = audio.currentTime;
+  [880, 1320].forEach((freq, i) => {
+    const osc = audio!.createOscillator();
+    const gain = audio!.createGain();
+    const t = start + i * 0.18;
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    osc.connect(gain).connect(audio!.destination);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  });
+}
+
+/** Plays the chime whenever the unread count goes up while the page is open. */
+function useNotificationSound(unread: number | null) {
+  const previous = useRef<number | null>(null);
+
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    document.addEventListener("pointerdown", unlock);
+    document.addEventListener("keydown", unlock);
+    return () => {
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (unread === null) return;
+    // The first count after the page opens is the starting point, not news.
+    if (previous.current !== null && unread > previous.current) playChime();
+    previous.current = unread;
+  }, [unread]);
+}
+
 const ago = (iso: string) => {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
   if (minutes < 1) return "just now";
@@ -102,9 +169,28 @@ const ago = (iso: string) => {
 
 export function NotificationBell() {
   const router = useRouter();
-  const [unread, checkNow] = useLiveUpdates();
+  const [live, checkNow] = useLiveUpdates();
+  useNotificationSound(live);
+  const unread = live ?? 0;
   const [open, setOpen] = useState(false);
+  const [sound, setSound] = useState(true);
   const [items, setItems] = useState<Item[] | null>(null);
+
+  useEffect(() => setSound(soundEnabled()), []);
+
+  function toggleSound() {
+    const next = !sound;
+    setSound(next);
+    try {
+      window.localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+    } catch {
+      // Not saved: applies until the page is reloaded.
+    }
+    if (next) {
+      unlockAudio();
+      playChime();
+    }
+  }
   const box = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -190,15 +276,26 @@ export function NotificationBell() {
         >
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2.5">
             <h2 className="text-brand-800 text-sm font-semibold">Notifications</h2>
-            {unread > 0 && (
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={markAll}
-                className="text-brand-700 text-xs font-medium hover:underline"
+                onClick={toggleSound}
+                aria-pressed={sound}
+                title={sound ? "Turn the alert sound off" : "Turn the alert sound on"}
+                className="text-xs font-medium text-gray-600 hover:underline"
               >
-                Mark all as read
+                {sound ? "Sound on" : "Sound off"}
               </button>
-            )}
+              {unread > 0 && (
+                <button
+                  type="button"
+                  onClick={markAll}
+                  className="text-brand-700 text-xs font-medium hover:underline"
+                >
+                  Mark all as read
+                </button>
+              )}
+            </div>
           </div>
           {items === null ? (
             <p className="px-4 py-6 text-center text-sm text-gray-500">Loading…</p>
