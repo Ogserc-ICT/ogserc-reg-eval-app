@@ -55,3 +55,6 @@ next-env.d.ts
 /deploy/.env
 /deploy/offsite.env
 /deploy/backups
+
+# workbook build scratch (npm run export:workbook)
+/exports/.build

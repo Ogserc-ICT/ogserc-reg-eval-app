@@ -27,7 +27,8 @@
     "smoke:standalone": "tsx scripts/smoke-standalone.ts",
     "vercel-build": "tsx scripts/vercel-build.ts",
     "finance-gate:dry-run": "tsx scripts/finance-gate-dry-run.ts",
-    "category-forms:dry-run": "tsx scripts/category-forms-dry-run.ts"
+    "category-forms:dry-run": "tsx scripts/category-forms-dry-run.ts",
+    "export:workbook": "tsx scripts/export-workbook.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
