@@ -30,6 +30,9 @@ jobs:
       RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY: ${{ secrets.RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY }}
       RCLONE_CONFIG_OFFSITE_REGION: ${{ secrets.RCLONE_CONFIG_OFFSITE_REGION }}
       RCLONE_CONFIG_OFFSITE_ENDPOINT: ${{ secrets.RCLONE_CONFIG_OFFSITE_ENDPOINT }}
+      # Google Drive (type drive): the token from `rclone authorize`.
+      RCLONE_CONFIG_OFFSITE_SCOPE: ${{ secrets.RCLONE_CONFIG_OFFSITE_SCOPE }}
+      RCLONE_CONFIG_OFFSITE_TOKEN: ${{ secrets.RCLONE_CONFIG_OFFSITE_TOKEN }}
       SCRATCH: ogserc_restore_test
     steps:
       - uses: actions/checkout@v4

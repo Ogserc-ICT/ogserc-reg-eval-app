@@ -52,6 +52,16 @@ if [ -n "${RCLONE_REMOTE:-}" ]; then
   rclone copy --no-traverse "$FILE" "$RCLONE_REMOTE/daily/"
   [ -f "$BACKUPS/weekly/$NAME" ] && rclone copy --no-traverse "$FILE" "$RCLONE_REMOTE/weekly/"
   log "Copied off-site to $RCLONE_REMOTE"
+  # Storage without lifecycle rules (Google Drive) is pruned here; unset keeps every off-site copy.
+  # On Drive the removed files go to the bin, which empties itself after 30 days.
+  if [ -n "${BACKUP_OFFSITE_KEEP_DAILY_DAYS:-}" ]; then
+    rclone delete --min-age "${BACKUP_OFFSITE_KEEP_DAILY_DAYS}d" "$RCLONE_REMOTE/daily/"
+    log "Removed off-site daily copies older than $BACKUP_OFFSITE_KEEP_DAILY_DAYS days"
+  fi
+  if [ -n "${BACKUP_OFFSITE_KEEP_WEEKLY_DAYS:-}" ]; then
+    rclone delete --min-age "${BACKUP_OFFSITE_KEEP_WEEKLY_DAYS}d" "$RCLONE_REMOTE/weekly/"
+    log "Removed off-site weekly copies older than $BACKUP_OFFSITE_KEEP_WEEKLY_DAYS days"
+  fi
 else
   log "WARNING: no off-site copy (RCLONE_REMOTE not set)"
 fi
