@@ -41,7 +41,9 @@ if [ "$(date +%u)" = "7" ]; then
 fi
 
 prune() { # keep the newest $2 files in $1
-  ls -1t "$1"/ogserc-*.dump.enc 2>/dev/null | tail -n +"$(($2 + 1))" | while read -r old; do
+  # `|| true`: ls fails on a folder with no backups yet (weekly/ before the first Sunday), and
+  # pipefail would turn that into a failed run.
+  { ls -1t "$1"/ogserc-*.dump.enc 2>/dev/null || true; } | tail -n +"$(($2 + 1))" | while read -r old; do
     rm -f "$old" && log "Removed old backup $old"
   done
 }
