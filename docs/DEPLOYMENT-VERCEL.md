@@ -139,7 +139,8 @@ Neon keeps its own short history, but you also want **your own encrypted copies,
    | `RCLONE_CONFIG_OFFSITE_KEY` | the B2 *applicationKey* |
 
    (Any S3-compatible storage works instead of B2: type `s3` plus `..._PROVIDER`,
-   `..._ACCESS_KEY_ID`, `..._SECRET_ACCESS_KEY`, `..._REGION`, `..._ENDPOINT`.)
+   `..._ACCESS_KEY_ID`, `..._SECRET_ACCESS_KEY`, `..._REGION`, `..._ENDPOINT`. For Google Drive
+   see below.)
 4. **Test it:** GitHub → **Actions → Nightly database backup → Run workflow**. It should finish
    green in 2–3 minutes, and a file `ogserc-….dump.enc` appears in the bucket's `daily/` folder.
 5. **Restore drill:** **Actions → Restore drill → Run workflow**. It restores the newest backup into
@@ -148,6 +149,43 @@ Neon keeps its own short history, but you also want **your own encrypted copies,
 
 From then on the backup runs every night at about 02:30 Lagos time. If a run fails, GitHub emails
 the repository owner.
+
+### Google Drive instead of B2
+
+Use a Google account the Commission controls, not a staff member's personal one. The backups are
+encrypted, so Google cannot read them.
+
+1. **Get a Drive token** on any Windows, macOS or Linux computer with a browser. Install rclone
+   (Windows: `winget install Rclone.Rclone` or `scoop install rclone`), then run:
+
+   ```sh
+   rclone authorize "drive" "eyJzY29wZSI6ImRyaXZlLmZpbGUifQ=="
+   ```
+
+   (The quoted value is `{"scope":"drive.file"}`: rclone can see only the files it creates, not the
+   rest of the Drive.) A browser opens; sign in with the backup account and allow access. The
+   terminal then prints a token between `--->` and `<---End paste`. Copy the whole line that starts
+   `{"access_token":` and ends `}`.
+2. **GitHub secrets** (same place as step 6.3). Keep `BACKUP_DATABASE_URL` and `BACKUP_PASSPHRASE`;
+   in place of the B2 ones add:
+
+   | Secret | Value |
+   |---|---|
+   | `RCLONE_REMOTE` | `offsite:ogserc-backups` (a Drive folder; created on the first run) |
+   | `RCLONE_CONFIG_OFFSITE_TYPE` | `drive` |
+   | `RCLONE_CONFIG_OFFSITE_SCOPE` | `drive.file` |
+   | `RCLONE_CONFIG_OFFSITE_TOKEN` | the `{"access_token": …}` line from 1 |
+
+3. **Retention.** Drive has no lifecycle rules, so the workflow prunes old copies itself. Under
+   **Secrets and variables → Actions → Variables** add `BACKUP_OFFSITE_KEEP_DAILY_DAYS` = `30` and
+   `BACKUP_OFFSITE_KEEP_WEEKLY_DAYS` = `365`. Removed files go to the Drive bin, which empties itself
+   after 30 days. Without these variables every copy is kept until the Drive is full.
+4. Test and run the restore drill as in 6.4 and 6.5. The files appear in Drive under
+   `ogserc-backups/daily/` (and `weekly/` on Sundays).
+
+The token keeps working while the account exists and its access is not removed (Google Account →
+Security → Third-party connections → rclone). If it stops working, the nightly run fails (GitHub
+emails you); repeat 1 and replace the token secret.
 
 ## Step 7: Check the daily review
 
