@@ -159,13 +159,17 @@ encrypted, so Google cannot read them.
    (Windows: `winget install Rclone.Rclone` or `scoop install rclone`), then run:
 
    ```sh
-   rclone authorize "drive" "eyJzY29wZSI6ImRyaXZlLmZpbGUifQ=="
+   rclone authorize "drive" "eyJzY29wZSI6ImRyaXZlLmZpbGUifQ"
    ```
 
-   (The quoted value is `{"scope":"drive.file"}`: rclone can see only the files it creates, not the
-   rest of the Drive.) A browser opens; sign in with the backup account and allow access. The
+   (The quoted value is `{"scope":"drive.file"}` in unpadded base64; rclone 1.75 rejects a trailing
+   `==`. With it, rclone can see only the files it creates, not the rest of the Drive.) A browser
+   opens; sign in with the backup account and allow access. The
    terminal then prints a token between `--->` and `<---End paste`. Copy the whole line that starts
-   `{"access_token":` and ends `}`.
+   `{"access_token":` and ends `}`: the access token alone (`ya29.…`) is not enough, the line must
+   include `"refresh_token"`. On Windows, add
+   `| Select-String '^\{"access_token"' | ForEach-Object { $_.Line } | Set-Clipboard` to the command
+   to put the line straight on the clipboard.
 2. **GitHub secrets** (same place as step 6.3). Keep `BACKUP_DATABASE_URL` and `BACKUP_PASSPHRASE`;
    in place of the B2 ones add:
 
