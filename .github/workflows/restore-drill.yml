@@ -60,7 +60,8 @@ jobs:
           echo "Newest backup: $latest"
 
       - name: Restore into a scratch database
-        run: sh deploy/scheduler/restore.sh "$BACKUP_FILE" "$SCRATCH"
+        # bash, not sh: Ubuntu's sh (dash) has no `set -o pipefail`; the container's busybox sh does.
+        run: bash deploy/scheduler/restore.sh "$BACKUP_FILE" "$SCRATCH"
 
       - name: Compare with the live database
         run: |
