@@ -71,4 +71,5 @@ jobs:
       - name: Back up, check and copy off-site
         env:
           BACKUP_ROOT: ${{ runner.temp }}/backups
-        run: sh deploy/scheduler/backup.sh
+        # bash, not sh: Ubuntu's sh (dash) has no `set -o pipefail`; the container's busybox sh does.
+        run: bash deploy/scheduler/backup.sh
