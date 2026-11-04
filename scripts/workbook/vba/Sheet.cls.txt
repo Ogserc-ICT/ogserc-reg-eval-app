@@ -1,0 +1,10 @@
+' Every edit on this sheet is written to the Audit Log (old -> new). Not tamper-proof.
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    On Error Resume Next
+    RememberOld Target
+End Sub
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    On Error Resume Next
+    LogEdit Me, Target
+End Sub
